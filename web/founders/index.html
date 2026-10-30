@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#090b11">
+<title>Kohu Founders</title>
+<meta name="description" content="Kohu Founders: Kō plans the day in 25 minute chunks for the Kohu Labs founder.">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../assets/favicon/apple-touch-icon.png">
+<link rel="preload" href="../assets/fonts/bricolage-grotesque-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="founders.css">
+</head>
+<body>
+<main id="app" class="kf-app" aria-label="Kohu Founders"></main>
+<noscript><p class="kf-noscript">Kohu Founders needs JavaScript.</p></noscript>
+
+<!-- The app's screens, from the Claude Design file "Ko Phone" (Kohu Founders App). founders.js fills in the
+     {{ values }}, <sc-if> shows its content when the value is true, <sc-for> repeats it for each item, and
+     <x-import> places a Kohu UI component (Kō, the stage bar, a KPI tile). See dc.js. -->
+<template id="ko-phone">
+  <div class="kf-bezel">
+  <div data-theme="dark" class="k-root kf-screen">
+    <div class="kf-status" aria-hidden="true" style="flex:none;height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;font:500 13px var(--font-sans);position:relative">
+      <span>9:41</span>
+      <i style="position:absolute;left:50%;top:10px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#05060a;box-shadow:0 0 0 1px rgba(255,255,255,0.08)"></i>
+      <span style="display:flex;align-items:center;gap:8px"><span class="k-mono" style="font-size:10px">5G</span><span style="width:22px;height:11px;border:1px solid var(--ink);border-radius:3px;padding:1px;box-sizing:border-box;display:flex"><i style="width:70%;background:var(--ink);border-radius:1px"></i></span></span>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;position:relative">
+
+      <sc-if value="{{ isOnboarding }}">
+        <div style="min-height:100%;display:flex;flex-direction:column;padding:12px 22px 22px;box-sizing:border-box;gap:22px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="k-mono" style="color:var(--muted)"><span style="color:var(--accent)">{{ stepNum }}</span> / 03</span>
+            <button class="k-lang" onClick="{{ toggleLang }}" style="background:none;font:inherit;cursor:pointer;min-height:36px;min-width:44px">{{ otherLang }}</button>
+          </div>
+          <sc-if value="{{ isStep0 }}">
+            <div style="flex:1;display:flex;flex-direction:column;gap:22px">
+              <div style="display:flex;justify-content:center;margin-top:10px">
+                <x-import component-from-global-scope="KohuUI.Signal" size="{{ 250 }}" theme="dark" mood="happy"></x-import>
+              </div>
+              <div class="k-mono" style="display:flex;align-items:center;gap:10px;color:var(--muted)"><i class="k-status-dot"></i>Kohu Labs · Founders</div>
+              <h1 style="margin:0;font-size:48px;font-weight:800;line-height:0.9;letter-spacing:-0.045em;text-wrap:balance">{{ t.welA }} <span style="color:var(--accent)">{{ t.welB }}</span></h1>
+              <p style="margin:0;color:var(--muted);font-size:16px;line-height:1.5;text-wrap:pretty">{{ t.welBody }}</p>
+              <div style="flex:1"></div>
+              <span class="k-mono" style="color:var(--muted);font-size:10px;line-height:1.6;text-transform:none;letter-spacing:0.04em;margin-bottom:-8px">{{ t.oauthNote }}</span>
+              <button class="k-btn k-btn-primary" onClick="{{ startOAuth }}" style="width:100%">{{ t.signIn }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isStep1 }}">
+            <div style="flex:1;display:flex;flex-direction:column;gap:20px">
+              <h1 style="margin:28px 0 0;font-size:48px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ t.conA }} <span style="color:var(--accent)">{{ t.conB }}</span></h1>
+              <p style="margin:0;color:var(--muted);font-size:16px;line-height:1.5;text-wrap:pretty">{{ t.conBody }}</p>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)">
+                <span class="k-mono" style="flex:none;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--accent)">JD</span>
+                <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:15px">João Duarte</div><div style="color:var(--muted);font:400 12px var(--font-mono)">hello@kohulabs.com</div></div>
+                <span class="k-pill k-pill-live"><i></i>{{ t.signedIn }}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:var(--radius-sharp);padding:3px;gap:3px">
+                <sc-for list="{{ providerOpts }}" as="p">
+                  <button onClick="{{ p.onClick }}" style="min-height:52px;padding:8px 10px;border:0;border-radius:var(--radius-sharp);background:{{ p.bg }};color:{{ p.color }};cursor:pointer;text-align:left;display:grid;gap:3px"><span style="font:600 14px var(--font-sans)">{{ p.label }}</span><span style="font:400 10px var(--font-mono);letter-spacing:0.06em;text-transform:uppercase;opacity:0.75">{{ p.sub }}</span></button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ localNotConnected }}">
+                <span style="color:var(--muted);font-size:14px;line-height:1.45">{{ t.localPitch }}</span>
+                <button class="k-btn k-btn-primary" onClick="{{ startLocal }}" style="width:100%">{{ t.pairBtn }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button>
+              </sc-if>
+              <sc-if value="{{ localConnected }}">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="display:grid;gap:3px"><span style="font-weight:600">{{ localHost.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ localHost.meta }}</span></span><span class="k-pill k-pill-live"><i></i>{{ t.connected }}</span></div>
+                <div style="display:grid;gap:8px">
+                  <span class="k-mono" style="color:var(--muted)">{{ t.localModels }}</span>
+                  <sc-for list="{{ localModels }}" as="m">
+                    <button onClick="{{ m.onClick }}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;background:var(--surface);border:1px solid {{ m.border }};border-radius:var(--radius-sharp);color:var(--ink);font:400 13px var(--font-mono);cursor:pointer;text-align:left">
+                      <span>{{ m.name }}</span><span style="display:flex;align-items:center;gap:10px"><span style="color:var(--muted);font-size:10px">{{ m.size }}</span><i style="width:12px;height:12px;border-radius:50%;border:1px solid {{ m.border }};background:{{ m.dot }}"></i></span>
+                    </button>
+                  </sc-for>
+                </div>
+                <span class="k-mono" style="color:var(--muted);font-size:10px;line-height:1.6;text-transform:none;letter-spacing:0.04em">{{ t.localFallback }}</span>
+              </sc-if>
+              <sc-if value="{{ orNotConnected }}">
+                <button class="k-btn k-btn-primary" onClick="{{ startOR }}" style="width:100%">{{ t.connectOR }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button>
+              </sc-if>
+              <sc-if value="{{ orConnected }}">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600">OpenRouter</span><span style="display:flex;align-items:center;gap:10px"><span class="k-mono" style="color:var(--muted);font-size:10px">{{ capLabel }} {{ t.perMonth }}</span><span class="k-pill k-pill-live"><i></i>{{ t.connected }}</span></span></div>
+              <div style="display:grid;gap:8px">
+                <span class="k-mono" style="color:var(--muted)">{{ t.modelLabel }}</span>
+                <sc-for list="{{ models }}" as="m">
+                  <button onClick="{{ m.onClick }}" style="display:flex;justify-content:space-between;align-items:center;padding:14px;background:var(--surface);border:1px solid {{ m.border }};border-radius:var(--radius-sharp);color:var(--ink);font:400 13px var(--font-mono);cursor:pointer;text-align:left">
+                    <span>{{ m.name }}</span>
+                    <i style="width:12px;height:12px;border-radius:50%;border:1px solid {{ m.border }};background:{{ m.dot }}"></i>
+                  </button>
+                </sc-for>
+              </div>
+              </sc-if>
+              <div style="flex:1"></div>
+              <sc-if value="{{ brainReady }}"><button class="k-btn k-btn-primary" onClick="{{ nextStep }}" style="width:100%">{{ t.cont }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button></sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isStep2 }}">
+            <div style="flex:1;display:flex;flex-direction:column;gap:20px">
+              <h1 style="margin:28px 0 0;font-size:48px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ t.wakA }} <span style="color:var(--accent)">{{ t.wakB }}</span></h1>
+              <p style="margin:0;color:var(--muted);font-size:16px;line-height:1.5;text-wrap:pretty">{{ t.wakBody }}</p>
+              <div style="display:grid;gap:8px">
+                <span class="k-mono" style="color:var(--muted)">{{ t.wakePhrase }}</span>
+                <div style="display:flex;gap:6px">
+                  <sc-for list="{{ wakeOpts }}" as="w">
+                    <button class="{{ w.cls }}" onClick="{{ w.onClick }}" style="padding:10px 16px;font-size:15px">{{ w.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+                <span style="font-weight:600">{{ t.lock }}</span>
+                <button onClick="{{ toggleLock }}" aria-label="toggle" style="width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ lockBorder }};background:{{ lockBg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ lockKnob }};width:18px;height:18px;border-radius:50%;background:{{ lockDot }};transition:left 0.2s ease"></i></button>
+              </div>
+              <div style="flex:1"></div>
+              <button class="k-btn k-btn-primary" onClick="{{ finishOnboarding }}" style="width:100%">{{ t.finish }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showTopBar }}">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 22px 0">
+          <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap;min-width:0;overflow:hidden"><i class="k-status-dot"></i>{{ t.date }}</span>
+          <button class="k-lang" onClick="{{ toggleLang }}" style="flex:none;background:none;font:inherit;cursor:pointer;min-height:36px;min-width:44px">{{ otherLang }}</button>
+        </div>
+        <sc-if value="{{ showTabs }}">
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin:10px 22px 0;padding:3px;border:1px solid var(--line);border-radius:var(--radius-sharp)">
+          <sc-for list="{{ modeOpts }}" as="m"><button onClick="{{ m.onClick }}" style="min-height:40px;padding:0 4px;border:0;border-radius:var(--radius-sharp);background:{{ m.bg }};color:{{ m.color }};font:600 13px var(--font-sans);cursor:pointer;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:5px"><i style="flex:none;width:6px;height:6px;border-radius:50%;background:{{ m.dot }}"></i>{{ m.label }}</button></sc-for>
+        </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ isHomeKo }}">
+        <div ref="{{ stageRef }}" style="position:absolute;left:0;right:0;top:50px;bottom:0;overflow:hidden">
+          <div ref="{{ koRef }}" onClick="{{ toggleHome }}" style="position:absolute;left:0;top:0;width:200px;height:200px;z-index:2;cursor:pointer;will-change:transform">
+            <x-import component-from-global-scope="KohuUI.Signal" size="{{ 200 }}" theme="dark" mood="{{ homeMood }}" state="{{ homeState }}"></x-import>
+          </div>
+          <sc-if value="{{ homeClosed }}">
+            <span class="k-mono" style="position:absolute;left:0;right:0;bottom:18px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:10px"><i style="width:6px;height:6px;border-radius:50%;background:{{ behDot }}"></i>{{ behLabel }} · {{ t.tapKo }}</span>
+          </sc-if>
+          <sc-if value="{{ homeIsOpen }}">
+            <div style="position:absolute;left:22px;right:22px;top:200px;bottom:0;overflow-y:auto;scrollbar-width:none;display:grid;align-content:start;gap:14px;padding-bottom:16px;opacity:{{ tilesOp }};transform:translateY({{ tilesY }});transition:opacity 0.35s ease, transform 0.35s ease">
+              <sc-if value="{{ hasNow }}">
+                <div style="display:grid;gap:6px;justify-items:center;text-align:center">
+                  <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:10px"><i style="width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ t.now }} · {{ now.task }}</span>
+                  <span style="font-size:22px;font-weight:800;letter-spacing:-0.03em;line-height:1.05;text-wrap:balance">{{ now.title }}</span>
+                </div>
+              </sc-if>
+              <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;padding:3px;border:1px solid var(--line);border-radius:var(--radius-sharp)">
+                <sc-for list="{{ modeOpts }}" as="m"><button onClick="{{ m.onClick }}" style="min-height:40px;padding:0 4px;border:0;border-radius:var(--radius-sharp);background:{{ m.bg }};color:{{ m.color }};font:600 13px var(--font-sans);cursor:pointer;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:5px"><i style="flex:none;width:6px;height:6px;border-radius:50%;background:{{ m.dot }}"></i>{{ m.label }}</button></sc-for>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+                <sc-for list="{{ homeTiles }}" as="b">
+                  <button onClick="{{ b.onClick }}" style="display:grid;gap:6px;align-content:space-between;min-height:76px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);cursor:pointer;text-align:left;transition:border-color 0.2s ease" style-hover="border-color:var(--accent)">
+                    <span style="font:600 16px var(--font-sans);letter-spacing:-0.01em">{{ b.label }}</span>
+                    <span class="k-mono" style="color:var(--muted);font-size:10px">{{ b.meta }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isHomeTimeline }}">
+        <div style="padding:22px 22px 28px;display:grid;gap:22px;grid-template-columns:minmax(0,1fr)">
+          <sc-if value="{{ showHomeBack }}"><button onClick="{{ backToKo }}" class="k-mono" style="justify-self:start;align-self:flex-start;white-space:nowrap;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);padding:9px 12px;cursor:pointer">‹ Kō</button></sc-if>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ leftA }} <span style="color:var(--accent)">{{ t.leftB }}</span></h1>
+          <sc-if value="{{ showSynced }}">
+            <button onClick="{{ openTools }}" class="k-mono" style="margin-top:-8px;justify-self:start;background:none;border:0;padding:0;color:var(--muted);font-size:10px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;line-height:1.5"><i style="flex:none;width:6px;height:6px;border-radius:50%;background:var(--accent)"></i>{{ syncedText }}</button>
+          </sc-if>
+          <sc-if value="{{ canFeed }}">
+            <div style="display:grid;gap:10px;grid-template-columns:minmax(0,1fr);padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)">
+              <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap"><i style="flex:none;width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ t.feedLabel }}</span>
+              <div style="display:flex;gap:6px">
+                <input value="{{ feedInput }}" onChange="{{ onFeedInput }}" onKeyDown="{{ onFeedKey }}" placeholder="{{ t.feedPh }}" style="flex:1;min-width:0;width:0;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--bg);color:var(--ink);font:inherit;font-size:14px;outline:none">
+                <button onClick="{{ feedMic }}" class="k-mono" style="flex:none;padding:0 10px;border:1px solid {{ feedMicBorder }};border-radius:var(--radius-sharp);background:{{ feedMicBg }};color:{{ feedMicColor }};cursor:pointer">{{ t.mic }}</button>
+                <button onClick="{{ addFeed }}" style="flex:none;padding:0 14px;border:0;border-radius:var(--radius-sharp);background:var(--accent);color:var(--accent-ink);font:600 14px var(--font-sans);cursor:pointer">{{ t.add }}</button>
+              </div>
+              <sc-if value="{{ isGeneral }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="k-mono" style="color:var(--muted);font-size:10px">{{ t.goesTo }}</span><div style="display:flex;gap:4px"><sc-for list="{{ feedTargets }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div></sc-if>
+              <span style="font-size:13px;color:var(--muted);line-height:1.4;text-wrap:pretty">{{ feedNote }}</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ hasNow }}">
+            <div style="background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius-sharp);padding:18px;display:grid;gap:16px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+                <span class="k-mono" style="display:flex;align-items:center;gap:8px"><i style="width:8px;height:8px;border-radius:50%;background:var(--acid)"></i>{{ t.now }} · {{ now.min }} min</span>
+                <span class="k-mono" style="color:var(--muted)">{{ now.task }}</span>
+              </div>
+              <div onClick="{{ now.onClick }}" style="font-size:26px;font-weight:800;line-height:1;letter-spacing:-0.03em;cursor:{{ now.cursor }}">{{ now.title }}</div>
+              <div style="display:grid;gap:8px">
+                <div style="height:3px;background:var(--line)"><div style="height:3px;width:{{ progress }};background:var(--accent);transition:width 1s linear"></div></div>
+                <div style="display:flex;justify-content:space-between" class="k-mono"><span style="color:var(--muted)">{{ elapsedLabel }}</span><span>{{ remaining }}</span></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ markDone }}" style="justify-content:center">{{ t.done }}</button>
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ splitNow }}" style="justify-content:center">{{ t.split }}</button>
+              </div>
+              <button onClick="{{ openGuard }}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:40px;padding:10px 0 0;border:0;border-top:1px solid var(--line);background:none;color:var(--ink);cursor:pointer;text-align:left"><span class="k-mono" style="display:flex;align-items:center;gap:8px;font-size:10px"><i style="flex:none;width:7px;height:7px;border-radius:50%;background:{{ guardDot }}"></i>{{ guardLine }}</span><span style="color:var(--accent)">›</span></button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ dayDone }}">
+            <div style="border:1px solid var(--line);border-radius:var(--radius-sharp);padding:22px;display:grid;gap:6px"><b style="font-size:22px">{{ t.dayA }}</b><span style="color:var(--muted)">{{ t.dayB }}</span></div>
+          </sc-if>
+          <div>
+            <div class="k-mono" style="display:flex;justify-content:space-between;color:var(--muted);margin-bottom:6px"><span>{{ t.goalsLabel }}</span><span style="color:var(--accent)">{{ goalsCount }}</span></div>
+            <sc-for list="{{ goals }}" as="g">
+              <button onClick="{{ g.onClick }}" style="width:100%;display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;background:none;border:0;border-top:1px solid var(--line);color:var(--ink);cursor:pointer;text-align:left;font:inherit">
+                <span style="width:18px;height:18px;border-radius:var(--radius-sharp);border:1px solid var(--accent);background:{{ g.bg }};color:var(--accent-ink);font-size:12px;line-height:18px;text-align:center">{{ g.check }}</span>
+                <span style="font-weight:600;font-size:15px;line-height:1.25;color:{{ g.color }};text-decoration:{{ g.deco }}">{{ g.label }}</span>
+                <span class="k-mono" style="color:var(--muted);font-size:10px">{{ g.ws }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div>
+            <div class="k-mono" style="color:var(--muted);margin-bottom:6px">{{ t.later }}</div>
+            <sc-for list="{{ others }}" as="c">
+              <div onClick="{{ c.onClick }}" style="display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:baseline;padding:13px 0;border-top:1px solid var(--line);cursor:{{ c.cursor }};opacity:{{ c.opacity }}">
+                <span class="k-mono" style="color:var(--muted)">{{ c.time }}</span>
+                <div style="min-width:0"><div style="font-weight:600;font-size:15px;line-height:1.25;text-decoration:{{ c.deco }}">{{ c.title }}</div><div class="k-mono" style="color:var(--muted);margin-top:4px;font-size:10px">{{ c.meta }}</div></div>
+                <span class="k-mono" style="color:{{ c.markColor }}">{{ c.mark }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <button class="k-btn k-btn-ghost" onClick="{{ openReview }}" style="width:100%;justify-content:center">{{ t.revOpen }}</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isHomeFocus }}">
+        <div style="min-height:100%;box-sizing:border-box;padding:22px 22px 24px;display:flex;flex-direction:column;gap:18px">
+          <sc-if value="{{ showHomeBack }}"><button onClick="{{ backToKo }}" class="k-mono" style="justify-self:start;align-self:flex-start;white-space:nowrap;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);padding:9px 12px;cursor:pointer">‹ Kō</button></sc-if>
+          <sc-if value="{{ hasNow }}">
+            <div style="display:flex;flex-direction:column;gap:18px;flex:1">
+              <span class="k-mono" style="display:flex;align-items:center;gap:8px;margin-top:24px"><i style="width:8px;height:8px;border-radius:50%;background:var(--acid)"></i>{{ t.now }} · {{ now.task }}</span>
+              <div style="font-size:104px;font-weight:800;letter-spacing:-0.06em;line-height:0.85;font-variant-numeric:tabular-nums">{{ remainingClock }}</div>
+              <div onClick="{{ now.onClick }}" style="font-size:28px;font-weight:700;line-height:1.05;letter-spacing:-0.03em;cursor:{{ now.cursor }};text-wrap:balance">{{ now.title }}</div>
+              <div style="height:3px;background:var(--line)"><div style="height:3px;width:{{ progress }};background:var(--accent);transition:width 1s linear"></div></div>
+              <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px">
+                <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ markDone }}" style="justify-content:center">{{ t.done }}</button>
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ splitNow }}" style="justify-content:center">{{ t.split }}</button>
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ skipNow }}" style="justify-content:center">{{ t.skip }}</button>
+              </div>
+              <div style="flex:1"></div>
+              <div style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)">
+                <span style="flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:5px"><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i></span>
+                <span style="font-size:14px;line-height:1.45;color:var(--ink);text-wrap:pretty">{{ t.focusKo }}</span>
+              </div>
+              <sc-if value="{{ hasNext }}">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-top:14px;border-top:1px solid var(--line)">
+                  <span class="k-mono" style="color:var(--muted)">{{ t.upNext }} · {{ next.time }}</span>
+                  <span style="font-weight:600;font-size:15px;text-align:right">{{ next.title }}</span>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{ dayDone }}">
+            <h1 style="margin:60px 0 0;font-size:56px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ t.dayA }} <span style="color:var(--accent)">{{ t.dayB }}</span></h1>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isHomeMap }}">
+        <div style="padding:22px 22px 28px;display:grid;gap:20px">
+          <sc-if value="{{ showHomeBack }}"><button onClick="{{ backToKo }}" class="k-mono" style="justify-self:start;align-self:flex-start;white-space:nowrap;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);padding:9px 12px;cursor:pointer">‹ Kō</button></sc-if>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ t.mapA }} <span style="color:var(--accent)">{{ t.mapB }}</span></h1>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:var(--radius-sharp)">
+            <sc-for list="{{ mapStats }}" as="s">
+              <div style="padding:12px;border-left:1px solid var(--line);margin-left:-1px"><div class="k-mono" style="color:var(--muted);font-size:10px">{{ s.label }}</div><div style="font-size:26px;font-weight:800;letter-spacing:-0.04em;font-variant-numeric:tabular-nums;margin-top:4px">{{ s.value }}</div></div>
+            </sc-for>
+          </div>
+          <div style="display:grid;gap:4px">
+            <sc-for list="{{ mapRows }}" as="r">
+              <div style="display:grid;grid-template-columns:36px 1fr 1fr;gap:4px;align-items:stretch">
+                <span class="k-mono" style="color:var(--muted);font-size:10px;padding-top:4px">{{ r.hour }}</span>
+                <sc-for list="{{ r.cells }}" as="cell">
+                  <div onClick="{{ cell.onClick }}" style="height:36px;box-sizing:border-box;padding:5px 7px;border-radius:var(--radius-sharp);border:1px {{ cell.borderStyle }} {{ cell.border }};background:{{ cell.bg }};color:{{ cell.color }};font-size:11px;font-weight:600;line-height:1.2;overflow:hidden;display:flex;align-items:flex-start;gap:6px;cursor:{{ cell.cursor }}">
+                    <sc-if value="{{ cell.isNow }}"><i style="flex:none;width:7px;height:7px;margin-top:3px;border-radius:50%;background:var(--acid)"></i></sc-if>
+                    <span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ cell.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px" class="k-mono">
+            <span style="display:flex;align-items:center;gap:6px;color:var(--muted)"><i style="width:10px;height:10px;background:var(--accent)"></i>{{ t.lgDone }}</span>
+            <span style="display:flex;align-items:center;gap:6px;color:var(--muted)"><i style="width:8px;height:8px;border-radius:50%;background:var(--acid)"></i>{{ t.now }}</span>
+            <span style="display:flex;align-items:center;gap:6px;color:var(--muted)"><i style="width:10px;height:10px;border:1px solid var(--accent);box-sizing:border-box"></i>{{ t.lgPlanned }}</span>
+            <span style="display:flex;align-items:center;gap:6px;color:var(--muted)"><i style="width:10px;height:10px;border:1px dashed var(--line);box-sizing:border-box"></i>{{ t.lgFree }}</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isTask }}">
+        <div style="padding:14px 22px 28px;display:grid;gap:20px">
+          <button onClick="{{ goHome }}" class="k-mono" style="justify-self:start;white-space:nowrap;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);padding:9px 12px;cursor:pointer">‹ {{ t.navToday }}</button>
+          <span class="k-mono" style="color:var(--muted)"><span style="color:var(--accent)">{{ taskDoneCount }}/5</span> · {{ t.taskEyebrow }}</span>
+          <h1 style="margin:-6px 0 0;font-size:44px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ t.taskA }} <span style="color:var(--accent)">{{ t.taskB }}</span></h1>
+          <x-import component-from-global-scope="KohuUI.StageBar" current="{{ taskDoneCount }}" stages="{{ taskStages }}"></x-import>
+          <div>
+            <sc-for list="{{ taskRows }}" as="r">
+              <div style="display:grid;grid-template-columns:22px 1fr auto;gap:12px;align-items:center;padding:14px 0;border-top:1px solid var(--line)">
+                <span style="width:18px;height:18px;border-radius:var(--radius-sharp);border:1px solid {{ r.boxBorder }};background:{{ r.boxBg }};display:flex;align-items:center;justify-content:center;color:var(--accent-ink);font-size:12px;line-height:1">{{ r.check }}</span>
+                <span style="font-weight:600;font-size:15px;color:{{ r.color }};text-decoration:{{ r.deco }}">{{ r.name }}</span>
+                <span class="k-mono" style="color:var(--muted);font-size:10px">{{ r.when }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)">
+            <span style="flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:5px"><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i></span>
+            <span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ t.taskKo }}</span>
+          </div>
+          <div style="display:grid;gap:8px">
+            <button class="k-btn k-btn-primary" onClick="{{ goHome }}" style="width:100%">{{ t.startNext }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button>
+            <button class="k-btn k-btn-ghost" onClick="{{ askResplit }}" style="width:100%">{{ t.resplit }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showStatsTabs }}">
+        <div style="display:flex;gap:4px;border-bottom:1px solid var(--line);margin:12px 22px 0">
+          <sc-for list="{{ statsTabs }}" as="s"><button onClick="{{ s.onClick }}" style="min-height:44px;padding:0 12px;background:none;border:0;border-bottom:2px solid {{ s.bar }};margin-bottom:-1px;color:{{ s.color }};font:500 15px var(--font-sans);cursor:pointer">{{ s.label }}</button></sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isSpend }}">
+        <div style="padding:22px 22px 28px;display:grid;gap:20px">
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px">{{ t.spEyebrow }}</span>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ spA }} <span style="color:var(--accent)">{{ spB }}</span></h1>
+          <div style="display:grid;gap:8px">
+            <div style="position:relative;height:10px;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sharp)">
+              <div style="position:absolute;top:0;bottom:0;left:0;width:{{ spUsed }};background:var(--accent);transition:width 0.3s ease"></div>
+              <div style="position:absolute;top:-5px;bottom:-5px;left:{{ spProj }};border-left:1px dashed var(--ink)"></div>
+            </div>
+            <div class="k-mono" style="display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:10px"><span style="color:var(--ink)">{{ spPct }}</span><span>{{ t.spProjected }} {{ spProjVal }}</span><span>{{ t.spCap }} {{ capLabel }}</span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <sc-for list="{{ spKpis }}" as="k">
+              <x-import component-from-global-scope="KohuUI.KpiTile" label="{{ k.label }}" value="{{ k.value }}" delta="{{ k.delta }}" note="{{ k.note }}"></x-import>
+            </sc-for>
+          </div>
+          <div style="border:1px solid var(--line);border-radius:var(--radius-sharp);padding:16px;background:var(--surface);display:grid;gap:12px">
+            <div class="k-mono" style="display:flex;justify-content:space-between;color:var(--muted);font-size:10px"><span>{{ t.tokTitle }}</span><span style="color:var(--ink)">9.8M</span></div>
+            <div style="display:flex;height:10px;gap:2px"><sc-for list="{{ tokRows }}" as="k"><i style="height:10px;width:{{ k.w }};background:{{ k.color }};border-radius:1px"></i></sc-for></div>
+            <div>
+              <sc-for list="{{ tokRows }}" as="k">
+                <div style="display:grid;grid-template-columns:10px minmax(0,1fr) auto auto;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line)"><i style="width:8px;height:8px;background:{{ k.color }};border-radius:1px"></i><span style="font-weight:600;font-size:14px">{{ k.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ k.tokens }}</span><span style="font-weight:700;font-variant-numeric:tabular-nums;min-width:58px;text-align:right">{{ k.cost }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="border:1px solid var(--line);border-radius:var(--radius-sharp);padding:16px;display:grid;gap:10px">
+            <div class="k-mono" style="color:var(--muted);font-size:10px">{{ t.ctxTitle }}</div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span style="font-size:40px;font-weight:800;letter-spacing:-0.04em;line-height:1;font-variant-numeric:tabular-nums">62%</span><span class="k-mono" style="font-size:10px">124K / 200K</span></div>
+            <div style="position:relative;height:6px;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sharp)"><div style="position:absolute;top:0;bottom:0;left:0;width:62%;background:var(--accent)"></div><div style="position:absolute;top:-4px;bottom:-4px;left:80%;border-left:1px dashed var(--ink)"></div></div>
+            <span class="k-mono" style="color:var(--muted);font-size:10px;line-height:1.6;text-transform:none;letter-spacing:0.04em">{{ ctxLine }}</span>
+            <span class="k-mono" style="color:var(--muted);font-size:10px;line-height:1.6;text-transform:none;letter-spacing:0.04em">{{ t.ctxAvg }}</span>
+          </div>
+          <div style="border:1px solid var(--line);border-radius:var(--radius-sharp);padding:16px;background:var(--surface)">
+            <div class="k-mono" style="color:var(--muted);font-size:10px">{{ t.spDaily }}</div>
+            <div style="display:grid;grid-template-columns:repeat(14,1fr);gap:4px;align-items:end;height:90px;margin-top:14px">
+              <sc-for list="{{ spBars }}" as="b"><div style="height:{{ b.h }};background:{{ b.bg }};border:1px solid var(--accent);box-sizing:border-box;border-radius:var(--radius-sharp)"></div></sc-for>
+            </div>
+            <div class="k-mono" style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--muted)"><span>16</span><span style="color:var(--ink)">29</span></div>
+          </div>
+          <sc-for list="{{ spGroups }}" as="g">
+            <div>
+              <div class="k-mono" style="color:var(--muted);margin-bottom:4px">{{ g.title }}</div>
+              <sc-for list="{{ g.rows }}" as="r">
+                <div style="display:grid;gap:8px;padding:12px 0;border-top:1px solid var(--line)">
+                  <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><span style="display:grid;gap:3px;min-width:0"><span style="font-weight:600;font-size:14px;font-family:{{ r.font }}">{{ r.name }}</span><sc-if value="{{ r.hasSub }}"><span class="k-mono" style="color:var(--muted);font-size:10px">{{ r.sub }}</span></sc-if></span><span style="font-weight:700;font-variant-numeric:tabular-nums">{{ r.amount }}</span></div>
+                  <div style="height:3px;background:var(--line)"><div style="height:3px;width:{{ r.w }};background:var(--accent)"></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+          <div style="display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:var(--radius-sharp)">
+            <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted)"><i style="width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ t.noticed }}</span>
+            <span style="font-size:15px;line-height:1.45;text-wrap:pretty">{{ t.spInsight }}</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-top:12px;border-top:1px solid var(--line)"><span style="font-weight:600;font-size:14px">{{ t.spCapLabel }}</span><div style="display:flex;gap:4px"><sc-for list="{{ capOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isWeek }}">
+        <div style="padding:22px 22px 28px;display:grid;gap:20px">
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px"><span style="color:var(--accent)">44</span> · {{ t.weekEyebrow }}</span>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ t.weekA }} <span style="color:var(--accent)">{{ t.weekB }}</span></h1>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <sc-for list="{{ kpis }}" as="k">
+              <x-import component-from-global-scope="KohuUI.KpiTile" label="{{ k.label }}" value="{{ k.value }}" delta="{{ k.delta }}" note="{{ k.note }}"></x-import>
+            </sc-for>
+          </div>
+          <div style="border:1px solid var(--line);border-radius:var(--radius-sharp);padding:16px;background:var(--surface)">
+            <div class="k-mono" style="color:var(--muted);font-size:10px">{{ t.chart }}</div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:120px;margin-top:14px">
+              <sc-for list="{{ bars }}" as="b">
+                <div style="display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%">
+                  <span class="k-mono" style="font-size:10px;color:var(--muted)">{{ b.n }}</span>
+                  <div style="width:100%;height:{{ b.h }};background:{{ b.bg }};border:1px solid var(--accent);box-sizing:border-box;border-radius:var(--radius-sharp)"></div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:8px">
+              <sc-for list="{{ bars }}" as="b"><span class="k-mono" style="text-align:center;font-size:10px;color:{{ b.dayColor }}">{{ b.d }}</span></sc-for>
+            </div>
+          </div>
+          <div style="display:grid;gap:8px;padding:16px;border:1px solid var(--line);border-radius:var(--radius-sharp)">
+            <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted)"><i style="width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ t.noticed }}</span>
+            <span style="font-size:16px;line-height:1.45;text-wrap:pretty">{{ t.insight }}</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isKo }}">
+        <div style="height:100%;display:flex;flex-direction:column">
+          <div style="flex:none;position:relative;z-index:5;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 22px 10px;border-bottom:1px solid var(--line);pointer-events:none">
+            <div style="width:100%;display:flex;justify-content:space-between;align-items:center">
+              <span class="k-mono" style="color:var(--muted);font-size:10px">{{ modelName }}</span>
+              <button class="k-lang" onClick="{{ toggleLang }}" style="background:none;font:inherit;cursor:pointer;min-height:32px;min-width:40px;pointer-events:auto">{{ otherLang }}</button>
+            </div>
+            <div style="position:relative;z-index:6;pointer-events:auto"><x-import component-from-global-scope="KohuUI.Signal" size="{{ 170 }}" theme="dark" mood="happy" state="{{ koState }}"></x-import></div>
+            <span class="k-mono" style="display:flex;align-items:center;gap:8px"><i style="width:8px;height:8px;border-radius:50%;background:{{ koDot }}"></i>{{ koStatus }}</span>
+            <span style="font-size:12px;color:var(--muted);text-align:center">{{ koHint }}</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:12px;padding:14px 18px" ref="{{ logRef }}">
+            <sc-for list="{{ messages }}" as="msg">
+              <sc-if value="{{ msg.isUser }}"><div class="k-msg k-user">{{ msg.text }}</div></sc-if>
+              <sc-if value="{{ msg.isKo }}">
+                <div class="k-msg">
+                  <sc-if value="{{ msg.hasTools }}"><div class="k-mono" style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-bottom:6px"><i style="flex:none;width:6px;height:6px;border-radius:50%;background:var(--accent)"></i>{{ msg.tools }}</div></sc-if>
+                  <p>{{ msg.text }}</p>
+                  <sc-if value="{{ msg.hasItems }}">
+                    <ul><sc-for list="{{ msg.items }}" as="it"><li><b>{{ it.b }}</b><span>{{ it.s }}</span></li></sc-for></ul>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </sc-for>
+          </div>
+          <div style="flex:none;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:0 18px 10px">
+            <sc-for list="{{ chips }}" as="ch"><button class="k-chip" onClick="{{ ch.onClick }}" style="white-space:nowrap;flex:none">{{ ch.label }}</button></sc-for>
+          </div>
+          <div style="flex:none;display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line)">
+            <input value="{{ input }}" onChange="{{ onInput }}" onKeyDown="{{ onKey }}" placeholder="{{ t.placeholder }}" style="flex:1;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--bg);color:var(--ink);font:inherit;font-size:14px;outline:none">
+            <button onClick="{{ toggleMic }}" class="k-mono" style="flex:none;padding:0 12px;border:1px solid {{ micBorder }};border-radius:var(--radius-sharp);background:{{ micBg }};color:{{ micColor }};cursor:pointer">{{ t.mic }}</button>
+            <button onClick="{{ sendInput }}" style="flex:none;padding:0 14px;border:0;border-radius:var(--radius-sharp);background:var(--accent);color:var(--accent-ink);font:600 14px var(--font-sans);cursor:pointer">{{ t.send }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showInboxTabs }}">
+        <div style="display:flex;gap:4px;border-bottom:1px solid var(--line);margin:12px 22px 0">
+          <sc-for list="{{ inboxTabs }}" as="s"><button onClick="{{ s.onClick }}" style="min-height:44px;padding:0 12px;background:none;border:0;border-bottom:2px solid {{ s.bar }};margin-bottom:-1px;color:{{ s.color }};font:500 15px var(--font-sans);cursor:pointer">{{ s.label }}</button></sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isFollow }}">
+        <div style="padding:22px 22px 28px;display:grid;gap:20px;grid-template-columns:minmax(0,1fr)">
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px">{{ t.folEyebrow }}</span>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ folA }} <span style="color:var(--accent)">{{ folB }}</span></h1>
+          <div style="display:grid;gap:10px">
+            <span class="k-mono" style="color:var(--muted)">{{ t.folYou }}</span>
+            <sc-for list="{{ folYou }}" as="f">
+              <div style="display:grid;gap:8px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sharp)">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><b style="font-size:16px">{{ f.name }}</b><span class="k-mono" style="font-size:10px;color:{{ f.ageColor }}">{{ f.age }}</span></div>
+                <span style="color:var(--muted);font-size:14px;line-height:1.4">{{ f.what }}</span>
+                <span class="k-mono" style="color:var(--muted);font-size:10px">{{ f.meta }}</span>
+                <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ f.actions }}" as="a"><button class="{{ a.cls }}" onClick="{{ a.onClick }}" style="white-space:nowrap">{{ a.label }}</button></sc-for></div>
+              </div>
+            </sc-for>
+          </div>
+          <div>
+            <div class="k-mono" style="color:var(--muted);margin-bottom:6px">{{ t.folThem }}</div>
+            <sc-for list="{{ folThem }}" as="f">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)">
+                <div style="display:grid;gap:3px;min-width:0"><span style="font-weight:600;font-size:15px">{{ f.name }} · {{ f.what }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ f.age }} · {{ f.meta }}</span></div>
+                <button class="k-chip" onClick="{{ f.onNudge }}" style="white-space:nowrap">{{ f.nudgeLabel }}</button>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)"><span style="flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:5px"><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i></span><span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ t.folKo }}</span></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isInbox }}">
+        <div style="padding:22px 22px 28px;display:grid;gap:20px">
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px">{{ t.inboxEyebrow }}</span>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ inboxA }} <span style="color:var(--accent)">{{ inboxB }}</span></h1>
+          <div style="display:grid;gap:10px">
+            <sc-for list="{{ nudges }}" as="n">
+              <div style="display:grid;gap:10px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sharp)">
+                <div style="display:flex;justify-content:space-between;align-items:center"><span class="{{ n.pillCls }}"><i></i>{{ n.kind }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ n.time }}</span></div>
+                <b style="font-size:17px;line-height:1.2;letter-spacing:-0.01em">{{ n.title }}</b>
+                <span style="color:var(--muted);font-size:14px;line-height:1.45">{{ n.body }}</span>
+                <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ n.actions }}" as="a"><button class="{{ a.cls }}" onClick="{{ a.onClick }}" style="white-space:nowrap">{{ a.label }}</button></sc-for></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isTools }}">
+        <div style="padding:14px 22px 28px;display:grid;gap:20px">
+          <button onClick="{{ goYou }}" class="k-mono" style="justify-self:start;white-space:nowrap;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);padding:9px 12px;cursor:pointer">‹ {{ t.tlBack }}</button>
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px">{{ t.tlEyebrow }}</span>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ tlA }} <span style="color:var(--accent)">{{ t.tlB }}</span></h1>
+          <p style="margin:0;color:var(--muted);font-size:15px;line-height:1.5;text-wrap:pretty">{{ t.tlBody }}</p>
+          <div style="border-bottom:1px solid var(--line)">
+            <sc-for list="{{ servers }}" as="s">
+              <div style="display:grid;gap:10px;padding:14px 0;border-top:1px solid var(--line)">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+                  <span style="display:grid;gap:3px;min-width:0"><span style="font-weight:600">{{ s.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.meta }}</span></span>
+                  <button onClick="{{ s.onToggle }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ s.border }};background:{{ s.bg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ s.knob }};width:18px;height:18px;border-radius:50%;background:{{ s.dot }};transition:left 0.2s ease"></i></button>
+                </div>
+                <sc-if value="{{ s.on }}">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span class="k-mono" style="color:var(--muted);font-size:10px">{{ t.tlPerm }}</span><div style="display:flex;gap:4px"><sc-for list="{{ s.perms }}" as="p"><button class="{{ p.cls }}" onClick="{{ p.onClick }}" style="white-space:nowrap">{{ p.label }}</button></sc-for></div></div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <button class="k-btn k-btn-ghost" onClick="{{ openAddMcp }}" style="width:100%;justify-content:center">{{ t.tlAdd }}</button>
+          <div style="display:grid;gap:0;padding:16px;border:1px solid var(--line);border-radius:var(--radius-sharp)">
+            <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted);margin-bottom:8px"><i style="width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ t.tlLog }}</span>
+            <sc-for list="{{ logRows }}" as="r">
+              <div style="display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line)">
+                <span style="font:400 12px var(--font-mono)">{{ r.name }}</span><span class="k-mono" style="font-size:10px">{{ r.n }}</span><span class="k-mono" style="font-size:10px;color:{{ r.color }}">{{ r.mode }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isGuard }}">
+        <div style="padding:14px 22px 28px;display:grid;gap:20px;grid-template-columns:minmax(0,1fr)">
+          <button onClick="{{ goHome }}" class="k-mono" style="justify-self:start;white-space:nowrap;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);padding:9px 12px;cursor:pointer">‹ {{ t.navToday }}</button>
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px">{{ guardEyebrow }}</span>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ guardA }} <span style="color:var(--accent)">{{ guardB }}</span></h1>
+          <div>
+            <div class="k-mono" style="color:var(--muted);margin-bottom:6px">{{ t.guardHeld }}</div>
+            <sc-for list="{{ held }}" as="x">
+              <div style="display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:12px 0;border-top:1px solid var(--line)">
+                <span class="k-mono" style="color:var(--muted);font-size:10px">{{ x.time }}</span>
+                <div style="min-width:0"><div style="font-weight:600;font-size:15px">{{ x.app }}</div><div style="color:var(--muted);font-size:13px;margin-top:2px">{{ x.text }}</div></div>
+                <span class="k-mono" style="color:var(--muted);font-size:10px">{{ x.ws }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="border-bottom:1px solid var(--line)">
+            <sc-for list="{{ guardToggles }}" as="g">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ g.label }}</span><button onClick="{{ g.onClick }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ g.border }};background:{{ g.bg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ g.knob }};width:18px;height:18px;border-radius:50%;background:{{ g.dot }};transition:left 0.2s ease"></i></button></div>
+            </sc-for>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.guardVips }}</span><div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end"><sc-for list="{{ vips }}" as="v"><button class="{{ v.cls }}" onClick="{{ v.onClick }}" style="white-space:nowrap">{{ v.label }}</button></sc-for></div></div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)"><span style="flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:5px"><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i></span><span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ t.guardKo }}</span></div>
+          <div style="display:grid;gap:8px">
+            <button class="k-btn k-btn-primary" onClick="{{ releaseGuard }}" style="width:100%;justify-content:center">{{ t.guardRelease }}</button>
+            <button class="k-btn k-btn-ghost" onClick="{{ guardOffToday }}" style="width:100%;justify-content:center">{{ guardOffLabel }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isReview }}">
+        <div style="padding:14px 22px 28px;display:grid;gap:20px;grid-template-columns:minmax(0,1fr)">
+          <button onClick="{{ goHome }}" class="k-mono" style="justify-self:start;white-space:nowrap;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);padding:9px 12px;cursor:pointer">‹ {{ t.navToday }}</button>
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px">{{ t.revEyebrow }} · {{ modeLabel }}</span>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ revA }} <span style="color:var(--accent)">{{ revB }}</span></h1>
+          <div>
+            <div class="k-mono" style="color:var(--muted);margin-bottom:6px">{{ t.revSlipped }}</div>
+            <sc-for list="{{ slipped }}" as="s">
+              <div style="display:grid;gap:10px;padding:14px 0;border-top:1px solid var(--line)">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span style="font-weight:600;font-size:15px">{{ s.title }}</span><span class="k-mono" style="color:var(--muted);font-size:10px;white-space:nowrap">{{ s.meta }}</span></div>
+                <div style="display:flex;gap:4px"><sc-for list="{{ s.opts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div>
+              </div>
+            </sc-for>
+          </div>
+          <div>
+            <div class="k-mono" style="display:flex;justify-content:space-between;color:var(--muted);margin-bottom:6px"><span>{{ t.goalsLabel }}</span><span style="color:var(--accent)">{{ goalsCount }}</span></div>
+            <sc-for list="{{ goals }}" as="g">
+              <button onClick="{{ g.onClick }}" style="width:100%;display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;background:none;border:0;border-top:1px solid var(--line);color:var(--ink);cursor:pointer;text-align:left;font:inherit">
+                <span style="width:18px;height:18px;border-radius:var(--radius-sharp);border:1px solid var(--accent);background:{{ g.bg }};color:var(--accent-ink);font-size:12px;line-height:18px;text-align:center">{{ g.check }}</span>
+                <span style="font-weight:600;font-size:15px;color:{{ g.color }};text-decoration:{{ g.deco }}">{{ g.label }}</span>
+                <span class="k-mono" style="color:var(--muted);font-size:10px">{{ g.ws }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div>
+            <div class="k-mono" style="color:var(--muted);margin-bottom:6px">{{ t.revDone }}</div>
+            <sc-for list="{{ revDoneRows }}" as="d">
+              <div style="display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0;border-top:1px solid var(--line)"><span style="color:var(--accent);font-size:12px">✓</span><span style="font-size:14px;color:var(--muted)">{{ d.title }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ d.ws }}</span></div>
+            </sc-for>
+            <sc-if value="{{ hasRevMore }}"><div class="k-mono" style="color:var(--muted);font-size:10px;padding:9px 0;border-top:1px solid var(--line)">{{ revMore }}</div></sc-if>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600">{{ t.revFeel }}</span><div style="display:flex;gap:4px"><sc-for list="{{ feelOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+          <div style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)"><span style="flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:5px"><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i></span><span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ t.revKo }}</span></div>
+          <button class="k-btn k-btn-primary" onClick="{{ goHome }}" style="width:100%">{{ t.revClose }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isMeeting }}">
+        <div style="padding:14px 22px 28px;display:grid;gap:18px;grid-template-columns:minmax(0,1fr)">
+          <button onClick="{{ goHome }}" class="k-mono" style="justify-self:start;white-space:nowrap;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);padding:9px 12px;cursor:pointer">‹ {{ t.navToday }}</button>
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-6px">{{ t.meetEyebrow }}</span>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ t.meetA }} <span style="color:var(--accent)">{{ t.meetB }}</span></h1>
+          <div style="display:flex;gap:4px;border-bottom:1px solid var(--line)">
+            <sc-for list="{{ meetTabs }}" as="s"><button onClick="{{ s.onClick }}" style="min-height:44px;padding:0 12px;background:none;border:0;border-bottom:2px solid {{ s.bar }};margin-bottom:-1px;color:{{ s.color }};font:500 15px var(--font-sans);cursor:pointer">{{ s.label }}</button></sc-for>
+          </div>
+          <sc-if value="{{ meetPrep }}">
+            <div style="display:grid;gap:18px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span class="k-mono" style="flex:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--accent)">MS</span>
+                <div><div style="font-weight:600;font-size:16px">Marta Silva</div><div class="k-mono" style="color:var(--muted);font-size:10px;margin-top:3px">{{ t.meetWho }}</div></div>
+              </div>
+              <div style="display:grid;gap:8px;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)">
+                <span class="k-mono" style="color:var(--muted);font-size:10px">{{ t.meetThread }}</span>
+                <span style="font-size:15px;line-height:1.45;text-wrap:pretty">{{ t.meetThreadText }}</span>
+              </div>
+              <div>
+                <div class="k-mono" style="color:var(--muted);margin-bottom:6px">{{ t.meetAsks }}</div>
+                <sc-for list="{{ asks }}" as="a"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:12px 0;border-top:1px solid var(--line)"><span style="font-weight:600;font-size:15px">{{ a.b }}</span><span class="k-mono" style="color:var(--muted);font-size:10px;white-space:nowrap">{{ a.s }}</span></div></sc-for>
+              </div>
+              <div>
+                <div class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted);margin-bottom:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ t.meetPoints }}</div>
+                <sc-for list="{{ points }}" as="p"><div style="display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;align-items:baseline;padding:12px 0;border-top:1px solid var(--line)"><span class="k-mono" style="color:var(--accent)">{{ p.n }}</span><span style="font-size:15px;line-height:1.4">{{ p.text }}</span></div></sc-for>
+              </div>
+              <div class="k-mono" style="display:flex;align-items:center;gap:6px;color:var(--muted);font-size:10px"><i style="flex:none;width:6px;height:6px;border-radius:50%;background:var(--accent)"></i>{{ t.meetSources }}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ meetAddPoint }}" style="justify-content:center">{{ t.meetAdd }}</button>
+                <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ meetGoAfter }}" style="justify-content:center">{{ t.meetJoin }}</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ meetAfter }}">
+            <div style="display:grid;gap:18px">
+              <div style="display:grid;gap:8px;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)">
+                <span class="k-mono" style="color:var(--muted);font-size:10px">{{ t.meetSumLabel }}</span>
+                <span style="font-size:15px;line-height:1.45;text-wrap:pretty">{{ t.meetSum }}</span>
+              </div>
+              <div>
+                <div class="k-mono" style="color:var(--muted);margin-bottom:6px">{{ t.meetActions }}</div>
+                <sc-for list="{{ meetItems }}" as="a">
+                  <button onClick="{{ a.onClick }}" style="width:100%;display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;background:none;border:0;border-top:1px solid var(--line);color:var(--ink);cursor:pointer;text-align:left;font:inherit">
+                    <span style="width:18px;height:18px;border-radius:var(--radius-sharp);border:1px solid var(--accent);background:{{ a.bg }};color:var(--accent-ink);font-size:12px;line-height:18px;text-align:center">{{ a.check }}</span><span style="font-weight:600;font-size:15px">{{ a.b }}</span><span class="k-mono" style="color:var(--muted);font-size:10px;white-space:nowrap">{{ a.s }}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ meetNotMade }}"><button class="k-btn k-btn-primary" onClick="{{ makeTasks }}" style="width:100%">{{ makeTasksLabel }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button></sc-if>
+              <sc-if value="{{ meetMade }}"><div class="k-mono" style="display:flex;align-items:center;gap:8px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><i style="width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ tasksMadeLabel }}</div></sc-if>
+              <div style="display:grid;gap:10px;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp)">
+                <span class="k-mono" style="color:var(--muted);font-size:10px">{{ t.recap }}</span>
+                <span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ t.recapText }}</span>
+                <sc-if value="{{ recapPending }}"><div style="display:flex;gap:6px"><button class="k-chip k-primary" onClick="{{ sendRecap }}">{{ t.recapSend }}</button><button class="k-chip" onClick="{{ meetAddPoint }}">{{ t.recapEdit }}</button></div></sc-if>
+                <sc-if value="{{ recapSent }}"><span class="k-mono" style="display:flex;align-items:center;gap:6px;color:var(--muted);font-size:10px"><i style="width:6px;height:6px;border-radius:50%;background:var(--accent)"></i>{{ t.recapSent }}</span></sc-if>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isAlarms }}">
+        <div style="padding:14px 22px 28px;display:grid;gap:20px;grid-template-columns:minmax(0,1fr)">
+          <button onClick="{{ goYou }}" class="k-mono" style="justify-self:start;white-space:nowrap;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);padding:9px 12px;cursor:pointer">‹ {{ t.tlBack }}</button>
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px">{{ t.alEyebrow }}</span>
+          <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ alA }} <span style="color:var(--accent)">{{ t.alB }}</span></h1>
+          <div style="border-bottom:1px solid var(--line)">
+            <sc-for list="{{ alarmRows }}" as="a">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:16px 0;border-top:1px solid var(--line)">
+                <div style="display:grid;gap:5px;opacity:{{ a.opacity }}">
+                  <span style="font-size:40px;font-weight:800;letter-spacing:-0.04em;line-height:1;font-variant-numeric:tabular-nums">{{ a.time }}</span>
+                  <span style="font-weight:600;font-size:15px">{{ a.label }}</span>
+                  <span class="k-mono" style="color:var(--muted);font-size:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><sc-if value="{{ a.byKo }}"><i style="flex:none;width:6px;height:6px;border-radius:50%;background:var(--acid)"></i></sc-if>{{ a.meta }}</span>
+                </div>
+                <button onClick="{{ a.onToggle }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ a.border }};background:{{ a.bg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ a.knob }};width:18px;height:18px;border-radius:50%;background:{{ a.dot }};transition:left 0.2s ease"></i></button>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)">
+            <span style="flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:5px"><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i><i style="width:4px;height:4px;border-radius:50%;background:var(--ink)"></i></span>
+            <span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ t.alKo }}</span>
+          </div>
+          <div style="display:grid;gap:8px">
+            <button class="k-btn k-btn-primary" onClick="{{ askAlarm }}" style="width:100%">{{ t.alAsk }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button>
+            <button class="k-btn k-btn-ghost" onClick="{{ openRing }}" style="width:100%;justify-content:center">{{ t.alTest }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isYou }}">
+        <div style="padding:22px 22px 28px;display:grid;gap:22px">
+          <div style="display:flex;gap:14px;align-items:center">
+            <span class="k-mono" style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--accent);font-size:14px">JD</span>
+            <div><div style="font-size:24px;font-weight:800;letter-spacing:-0.03em;line-height:1.1">João Duarte</div><div style="color:var(--muted);margin-top:4px;font:400 12px var(--font-mono)">hello@kohulabs.com</div></div>
+          </div>
+          <div>
+            <div class="k-mono" style="color:var(--accent);margin-bottom:6px">01 <span style="color:var(--muted)">· {{ t.sAccount }}</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">Google Workspace</span><span class="k-pill k-pill-live"><i></i>{{ t.connected }}</span></div>
+            <sc-for list="{{ scopeRows }}" as="r"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ r.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ r.value }}</span></div></sc-for>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600">{{ t.revokeAll }}</span><button class="k-chip" onClick="{{ signOut }}" style="white-space:nowrap">{{ t.revoke }}</button></div>
+          </div>
+          <div>
+            <div class="k-mono" style="color:var(--accent);margin-bottom:6px">02 <span style="color:var(--muted)">· Kō</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);flex-wrap:wrap"><span style="font-weight:600">{{ t.sMode }}</span><div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ modeChips }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sTools }}</span>
+              <sc-if value="{{ isWork }}"><button class="k-chip" onClick="{{ openTools }}" style="white-space:nowrap">{{ toolsCountLabel }} ›</button></sc-if>
+              <sc-if value="{{ isPersonal }}"><span class="k-mono" style="color:var(--muted);font-size:10px">{{ t.toolsOff }}</span></sc-if>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sAlarms }}</span><button class="k-chip" onClick="{{ openAlarms }}" style="white-space:nowrap">{{ alarmCountLabel }} ›</button></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sModel }}</span><span class="k-mono" style="font-size:10px;color:var(--muted);text-align:right">{{ modelName }} ›</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.brain }}</span><div style="display:flex;gap:4px"><sc-for list="{{ providerChips }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+            <sc-if value="{{ isLocalProv }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="display:grid;gap:3px"><span style="font-weight:600">{{ localHost.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ localHost.meta }}</span></span><span class="k-pill k-pill-live"><i></i>{{ t.connected }}</span></div></sc-if>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.spCapLabel }}</span><div style="display:flex;gap:4px"><sc-for list="{{ capOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.wakePhrase }}</span><div style="display:flex;gap:4px"><sc-for list="{{ wakeOpts }}" as="w"><button class="{{ w.cls }}" onClick="{{ w.onClick }}" style="white-space:nowrap">{{ w.label }}</button></sc-for></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.tryWake }}</span><button class="k-chip" onClick="{{ openWake }}" style="white-space:nowrap">Hi Kō ›</button></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.lock }}</span><button onClick="{{ toggleLock }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ lockBorder }};background:{{ lockBg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ lockKnob }};width:18px;height:18px;border-radius:50%;background:{{ lockDot }};transition:left 0.2s ease"></i></button></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sChunk }}</span><div style="display:flex;gap:4px"><sc-for list="{{ chunkOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600">{{ t.sNudges }}</span><button onClick="{{ toggleNudges }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ nudgeBorder }};background:{{ nudgeBg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ nudgeKnob }};width:18px;height:18px;border-radius:50%;background:{{ nudgeDot }};transition:left 0.2s ease"></i></button></div>
+          </div>
+          <div>
+            <div class="k-mono" style="color:var(--accent);margin-bottom:6px">03 <span style="color:var(--muted)">· {{ t.sApp }}</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sLang }}</span><div style="display:flex;gap:4px"><sc-for list="{{ langOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600">{{ t.sTheme }}</span><span class="k-mono" style="color:var(--muted)">{{ t.dark }}</span></div>
+          </div>
+          <button class="k-btn k-btn-ghost" onClick="{{ signOut }}" style="width:100%;justify-content:center">{{ t.signOut }}</button>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ showNav }}">
+      <nav style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);align-items:stretch;height:64px;border-top:1px solid var(--line);background:var(--bg)">
+        <sc-for list="{{ navItems }}" as="n">
+          <button onClick="{{ n.onClick }}" style="position:relative;background:none;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:{{ n.color }};font:400 10px var(--font-mono);letter-spacing:0.1em;text-transform:uppercase">
+            <sc-if value="{{ n.isKo }}">
+              <span style="width:40px;height:40px;border-radius:50%;border:1px solid {{ n.ring }};background:var(--surface);display:flex;align-items:center;justify-content:center;gap:6px"><i style="width:5px;height:5px;border-radius:50%;background:{{ n.eye }}"></i><i style="width:5px;height:5px;border-radius:50%;background:{{ n.eye }}"></i></span>
+            </sc-if>
+            <sc-if value="{{ n.isTab }}">
+              <span>{{ n.label }}</span>
+              <i style="position:absolute;top:-1px;left:22%;right:22%;height:2px;background:{{ n.bar }}"></i>
+            </sc-if>
+            <sc-if value="{{ n.hasBadge }}"><i style="position:absolute;top:14px;right:18px;width:6px;height:6px;border-radius:50%;background:var(--acid)"></i></sc-if>
+          </button>
+        </sc-for>
+      </nav>
+    </sc-if>
+    <sc-if value="{{ showSheet }}">
+      <div style="position:absolute;inset:0;z-index:20;background:rgba(5,6,10,0.72);display:flex;flex-direction:column;justify-content:flex-end">
+        <div style="background:var(--surface);border-top:1px solid var(--line);padding:0 0 30px;display:grid;gap:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line)">
+            <span style="display:flex;align-items:center;gap:8px;font:400 12px var(--font-mono);color:var(--muted)"><svg width="10" height="12" viewBox="0 0 10 12" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="5" width="8" height="6" rx="1"></rect><path d="M3 5V3.5a2 2 0 014 0V5"></path></svg>{{ sheetDomain }}</span>
+            <button onClick="{{ cancelSheet }}" aria-label="close" style="width:32px;height:32px;background:none;border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--ink);cursor:pointer;font-size:16px">×</button>
+          </div>
+          <sc-if value="{{ sheetAccount }}">
+            <div style="padding:22px 20px 0;display:grid;gap:16px">
+              <div><div style="font-size:24px;font-weight:800;letter-spacing:-0.03em;line-height:1.05">{{ t.chooseAcc }}</div><div style="color:var(--muted);margin-top:6px;font-size:14px">{{ t.toContinue }}</div></div>
+              <button onClick="{{ pickAccount }}" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border:1px solid var(--accent);border-radius:var(--radius-sharp);color:var(--ink);cursor:pointer;text-align:left;font:inherit">
+                <span class="k-mono" style="flex:none;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sharp);color:var(--accent)">JD</span>
+                <span style="flex:1;min-width:0"><span style="display:block;font-weight:600">João Duarte</span><span style="display:block;color:var(--muted);font:400 12px var(--font-mono)">hello@kohulabs.com</span></span>
+                <span style="color:var(--accent)">›</span>
+              </button>
+              <span style="color:var(--muted);font-size:14px;padding:4px 2px">{{ t.otherAcc }}</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ sheetConsent }}">
+            <div style="padding:22px 20px 0;display:grid;gap:16px">
+              <div><div style="font-size:22px;font-weight:800;letter-spacing:-0.03em;line-height:1.05;text-wrap:balance">{{ t.consentTitle }}</div><div style="color:var(--muted);margin-top:6px;font:400 12px var(--font-mono)">hello@kohulabs.com</div></div>
+              <div>
+                <sc-for list="{{ scopes }}" as="s">
+                  <button onClick="{{ s.onClick }}" style="width:100%;display:grid;grid-template-columns:20px 1fr;gap:12px;align-items:center;padding:12px 0;background:none;border:0;border-top:1px solid var(--line);color:var(--ink);cursor:pointer;text-align:left;font:inherit;font-size:14px">
+                    <span style="width:18px;height:18px;border-radius:var(--radius-sharp);border:1px solid var(--accent);background:{{ s.bg }};color:var(--accent-ink);font-size:12px;line-height:18px;text-align:center">{{ s.check }}</span>
+                    <span>{{ s.label }}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <span style="color:var(--muted);font-size:12px">{{ t.revokeNote }}</span>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ cancelSheet }}" style="justify-content:center">{{ t.cancel }}</button>
+                <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ allowOAuth }}" style="justify-content:center">{{ t.allow }}</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ sheetOR }}">
+            <div style="padding:22px 20px 0;display:grid;gap:16px">
+              <div><div style="font-size:24px;font-weight:800;letter-spacing:-0.03em;line-height:1.05">{{ t.orTitle }}</div><div style="color:var(--muted);margin-top:8px;font-size:14px;line-height:1.45">{{ t.orBody }}</div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600;font-size:14px">{{ t.spCapLabel }}</span><div style="display:flex;gap:4px"><sc-for list="{{ capOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ cancelSheet }}" style="justify-content:center">{{ t.cancel }}</button>
+                <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ authorizeOR }}" style="justify-content:center">{{ t.authorize }}</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ sheetLocal }}">
+            <div style="padding:22px 20px 0;display:grid;gap:16px">
+              <div><div style="font-size:24px;font-weight:800;letter-spacing:-0.03em;line-height:1.05">{{ t.pairTitle }}</div><div style="color:var(--muted);margin-top:8px;font-size:14px;line-height:1.45">{{ t.pairBody }}</div></div>
+              <div>
+                <div class="k-mono" style="color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:8px"><i class="k-status-dot"></i>{{ t.found }}</div>
+                <sc-for list="{{ hosts }}" as="d">
+                  <button onClick="{{ d.onClick }}" style="width:100%;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 0;background:none;border:0;border-top:1px solid var(--line);color:var(--ink);cursor:pointer;text-align:left;font:inherit">
+                    <span style="display:grid;gap:3px"><span style="font-weight:600;font-size:14px">{{ d.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ d.meta }}</span></span>
+                    <i style="width:12px;height:12px;border-radius:50%;border:1px solid {{ d.border }};background:{{ d.dot }}"></i>
+                  </button>
+                </sc-for>
+              </div>
+              <div style="display:grid;gap:8px">
+                <span class="k-mono" style="color:var(--muted)">{{ t.codeLabel }}</span>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px"><sc-for list="{{ pairCode }}" as="c"><span style="height:48px;display:flex;align-items:center;justify-content:center;border:1px solid var(--accent);border-radius:var(--radius-sharp);background:var(--bg);font:700 22px var(--font-mono)">{{ c.d }}</span></sc-for></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ cancelSheet }}" style="justify-content:center">{{ t.cancel }}</button>
+                <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ pairLocal }}" style="justify-content:center">{{ t.pair }}</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ sheetMcpAdd }}">
+            <div style="padding:22px 20px 0;display:grid;gap:16px">
+              <div><div style="font-size:24px;font-weight:800;letter-spacing:-0.03em;line-height:1.05">{{ t.mcpTitle }}</div><div style="color:var(--muted);margin-top:8px;font-size:14px;line-height:1.45">{{ t.mcpBody }}</div></div>
+              <div style="display:grid;gap:8px">
+                <span class="k-mono" style="color:var(--muted)">{{ t.mcpUrl }}</span>
+                <input value="{{ mcpUrl }}" onChange="{{ onMcpUrl }}" style="min-height:46px;padding:0 12px;border:1px solid var(--accent);border-radius:var(--radius-sharp);background:var(--bg);color:var(--ink);font:400 13px var(--font-mono);outline:none">
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600;font-size:14px">{{ t.mcpAuth }}</span><div style="display:flex;gap:4px"><sc-for list="{{ authOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ cancelSheet }}" style="justify-content:center">{{ t.cancel }}</button>
+                <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ discoverMcp }}" style="justify-content:center">{{ t.discover }}</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ sheetMcpFound }}">
+            <div style="padding:22px 20px 0;display:grid;gap:14px">
+              <div><div style="font-size:24px;font-weight:800;letter-spacing:-0.03em;line-height:1.05">{{ mcpFoundTitle }}</div><div style="color:var(--muted);margin-top:8px;font-size:14px;line-height:1.45">{{ t.mcpFoundBody }}</div></div>
+              <div>
+                <sc-for list="{{ mcpTools }}" as="s">
+                  <button onClick="{{ s.onClick }}" style="width:100%;display:grid;grid-template-columns:20px 1fr auto;gap:12px;align-items:center;padding:9px 0;background:none;border:0;border-top:1px solid var(--line);color:var(--ink);cursor:pointer;text-align:left">
+                    <span style="width:18px;height:18px;border-radius:var(--radius-sharp);border:1px solid var(--accent);background:{{ s.bg }};color:var(--accent-ink);font-size:12px;line-height:18px;text-align:center">{{ s.check }}</span>
+                    <span style="font:400 13px var(--font-mono)">{{ s.name }}</span>
+                    <span class="k-mono" style="font-size:10px;color:{{ s.kindColor }}">{{ s.kind }}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600;font-size:14px">{{ t.tlPerm }}</span><div style="display:flex;gap:4px"><sc-for list="{{ newPermOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ cancelSheet }}" style="justify-content:center">{{ t.cancel }}</button>
+                <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ connectMcp }}" style="justify-content:center">{{ t.connect }}</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ sheetLoading }}">
+            <div style="padding:40px 20px 20px;display:flex;flex-direction:column;align-items:center;gap:14px">
+              <span class="k-mono" style="display:flex;align-items:center;gap:10px"><i class="k-status-dot"></i>{{ sheetLoadingLabel }}</span>
+              <span style="color:var(--muted);font:400 11px var(--font-mono)">{{ sheetLoadingMeta }}</span>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isWake }}">
+      <div style="position:absolute;top:var(--kf-top);left:0;right:0;bottom:var(--kf-bottom);z-index:30;background:var(--bg);display:flex;flex-direction:column;padding:28px 20px 12px;box-sizing:border-box;gap:14px">
+        <div style="display:grid;gap:6px;justify-items:center;opacity:{{ wakeDim }};transition:opacity 0.3s ease">
+          <div style="font-size:92px;font-weight:800;letter-spacing:-0.06em;line-height:0.85;font-variant-numeric:tabular-nums">9:41</div>
+          <span class="k-mono" style="color:var(--muted)">{{ t.lockDate }}</span>
+        </div>
+        <sc-if value="{{ wakeAsleep }}"><div style="display:flex;gap:12px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sharp);margin-top:12px">
+          <span style="flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:5px"><i style="width:4px;height:4px;border-radius:50%;background:var(--acid)"></i><i style="width:4px;height:4px;border-radius:50%;background:var(--acid)"></i></span>
+          <div style="flex:1;min-width:0"><div class="k-mono" style="color:var(--muted);font-size:10px">{{ t.now }} · {{ now.task }}</div><div style="font-weight:600;font-size:14px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ now.title }}</div></div>
+          <span class="k-mono" style="flex:none">{{ remainingClock }}</span>
+        </div></sc-if>
+        <div style="flex:1"></div>
+        <sc-if value="{{ wakeAsleep }}">
+          <div style="display:grid;gap:14px;justify-items:center;padding-bottom:8px">
+            <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted)"><i style="width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ t.wListening }}</span>
+            <button class="k-btn k-btn-ghost" onClick="{{ wakeUp }}" style="width:100%;justify-content:center">{{ t.wSimulate }}</button>
+            <button onClick="{{ exitWake }}" class="k-mono" style="background:none;border:0;color:var(--muted);cursor:pointer;min-height:44px">{{ t.wUnlock }}</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ wakeAwake }}">
+          <div style="display:grid;gap:14px;padding:18px;background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius-sharp)">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+              <div style="position:relative;z-index:6"><x-import component-from-global-scope="KohuUI.Signal" size="{{ 170 }}" theme="dark" mood="happy" state="{{ wakeSignal }}"></x-import></div>
+              <div style="display:grid;gap:4px;justify-items:center"><span class="k-mono" style="display:flex;align-items:center;gap:8px"><i style="width:8px;height:8px;border-radius:50%;background:{{ wakeDot }}"></i>{{ wakeStatus }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ t.wOnDevice }}</span></div>
+            </div>
+            <div style="font-size:22px;font-weight:700;line-height:1.15;letter-spacing:-0.02em;min-height:52px;text-align:center">{{ wakeHeard }}<span style="color:var(--accent)">{{ wakeCaret }}</span></div>
+            <sc-if value="{{ wakeAnswered }}">
+              <div style="display:grid;gap:12px;padding-top:12px;border-top:1px solid var(--line)">
+                <span style="font-size:15px;line-height:1.45;text-wrap:pretty">{{ t.wAnswer }}</span>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ exitWake }}" style="justify-content:center">{{ t.wOpen }}</button>
+                  <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ sleepKo }}" style="justify-content:center">{{ t.wStart }}</button>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isRing }}">
+      <div style="position:absolute;top:var(--kf-top);left:0;right:0;bottom:var(--kf-bottom);z-index:30;background:var(--bg);display:flex;flex-direction:column;padding:28px 20px 12px;box-sizing:border-box;gap:14px">
+        <sc-if value="{{ ringOn }}">
+          <div style="display:grid;gap:8px;justify-items:center;margin-top:12px">
+            <span class="k-mono" style="display:flex;align-items:center;gap:8px"><i style="width:8px;height:8px;border-radius:50%;background:var(--acid)"></i>{{ t.alarm }} · {{ ringLabel }}</span>
+            <div style="font-size:112px;font-weight:800;letter-spacing:-0.06em;line-height:0.85;font-variant-numeric:tabular-nums">{{ ringTime }}</div>
+            <span class="k-mono" style="color:var(--muted)">{{ t.ringDate }}</span>
+          </div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center"><x-import component-from-global-scope="KohuUI.Signal" size="{{ 200 }}" theme="dark" mood="happy" state="speaking"></x-import></div>
+          <span class="k-mono" style="color:var(--muted);text-align:center;font-size:10px">{{ ringNote }}</span>
+          <div style="display:grid;gap:8px">
+            <button class="k-btn k-btn-primary" onClick="{{ ringUp }}" style="width:100%;justify-content:center">{{ t.ringUp }}</button>
+            <button class="k-btn k-btn-ghost" onClick="{{ ringSnooze }}" style="width:100%;justify-content:center">{{ t.ringSnooze }}</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ ringBrief }}">
+          <div style="display:grid;gap:6px;justify-items:center">
+            <div style="font-size:64px;font-weight:800;letter-spacing:-0.06em;line-height:0.85;font-variant-numeric:tabular-nums">{{ ringTimeAfter }}</div>
+            <span class="k-mono" style="color:var(--muted)">{{ t.ringDate }}</span>
+          </div>
+          <div style="display:grid;gap:14px;padding:18px;background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius-sharp);margin-top:6px">
+            <span class="k-mono" style="display:flex;align-items:center;gap:8px"><i style="width:8px;height:8px;border-radius:50%;background:var(--acid)"></i>{{ t.briefTitle }} · {{ modeLabel }}</span>
+            <span style="font-size:20px;font-weight:700;line-height:1.2;letter-spacing:-0.02em;text-wrap:pretty">{{ briefText }}</span>
+            <div>
+              <sc-for list="{{ briefItems }}" as="b">
+                <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line)"><span class="k-mono" style="color:var(--muted);font-size:10px">{{ b.k }}</span><span style="font-weight:600;font-size:14px;line-height:1.3">{{ b.v }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ ringToKo }}" style="justify-content:center">{{ t.wOpen }}</button>
+            <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ ringToToday }}" style="justify-content:center">{{ t.ringToday }}</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+    <div class="kf-homebar" aria-hidden="true" style="flex:none;height:20px;display:flex;align-items:center;justify-content:center"><i style="width:108px;height:4px;border-radius:99px;background:var(--ink);opacity:0.55"></i></div>
+  </div>
+  </div>
+</template>
+
+<script src="../js/signal.js"></script>
+<script src="dc.js"></script>
+<script src="founders.js"></script>
+</body>
+</html>

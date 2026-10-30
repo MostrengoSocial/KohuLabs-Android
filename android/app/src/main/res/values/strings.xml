@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Kohu Founders</string>
+    <string name="cloud_unavailable">The cloud is not set up yet. Kohu Founders keeps your day on this phone for now.</string>
+    <string name="cloud_sign_in_failed">Sign-in did not finish. Try again.</string>
+    <string name="cloud_not_invited">This Google account is not on the Kohu Founders list.</string>
+</resources>

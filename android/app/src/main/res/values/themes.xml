@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark, like the app. The window background shows behind the system bars and while the page loads. -->
+    <style name="Theme.KohuFounders" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/kohu_bg</item>
+        <item name="android:colorAccent">@color/kohu_accent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

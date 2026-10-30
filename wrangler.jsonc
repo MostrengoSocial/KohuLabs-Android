@@ -1,0 +1,28 @@
+// Cloudflare Worker for the Kohu Founders app (api/): Google sign-in and the cloud copy of the founder's day.
+// Deployed with `npx wrangler deploy` (pushes to main, through Cloudflare Workers Builds: a Worker named kohu-founders
+// connected to this repository, with the default commands) or `npx wrangler versions upload` for other branches.
+//
+// Secrets are NOT stored here. Add them in the dashboard (Worker → Settings → Variables and Secrets, type "Secret"):
+//   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET   a Google OAuth client whose redirect URI is
+//                                            https://founders.kohulabs.com/auth/google/callback
+//   SESSION_SECRET                           32+ random characters, not the portal's
+{
+  "name": "kohu-founders",
+  "main": "./api/index.js",
+  "compatibility_date": "2026-10-01",
+  // Its own address; the first deploy creates the DNS record (kohulabs.com is on Cloudflare).
+  "routes": [{ "pattern": "founders.kohulabs.com", "custom_domain": true }],
+  "workers_dev": false,
+  // The cloud copy. No database_id on purpose: the first deploy creates the database (Cloudflare's automatic
+  // provisioning) and keeps it linked to this Worker. The Worker sets up its tables itself from db/migrations/ on the
+  // first sync (api/migrations.js).
+  "d1_databases": [
+    { "binding": "DB", "database_name": "kohu-founders" }
+  ],
+  "vars": {
+    // The Google accounts allowed into the app (comma-separated).
+    "FOUNDER_EMAILS": "hello@kohulabs.com"
+  },
+  // keep any variables added in the dashboard when deploying
+  "keep_vars": true
+}
