@@ -1,10 +1,10 @@
-package com.kohulabs.founders
+package com.kohulabs.android
 
 import android.content.Intent
 import android.provider.AlarmClock
 import android.webkit.JavascriptInterface
-import com.kohulabs.founders.data.FoundersDatabase
-import com.kohulabs.founders.data.FoundersStore
+import com.kohulabs.android.data.FoundersDatabase
+import com.kohulabs.android.data.FoundersStore
 import org.json.JSONArray
 import org.json.JSONObject
 

@@ -1,4 +1,4 @@
-// Tests for the Kohu Founders API: the app's sign-in and sync. No dependencies: `node --test api/test.mjs`
+// Tests for the kohulabs-android API: the app's sign-in and sync. No dependencies: `node --test api/test.mjs`
 // (Node 22+; Node's SQLite stands in for D1, see fake-d1.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,8 +8,8 @@ import { FakeD1 } from './fake-d1.mjs';
 import { PAGE } from './sync.js';
 
 const SECRET = 'f'.repeat(40);
-const ENV = { GOOGLE_CLIENT_ID: 'client-founders', GOOGLE_CLIENT_SECRET: 'shh', SESSION_SECRET: SECRET, FOUNDER_EMAILS: 'hello@kohulabs.com, ana@kohulabs.com' };
-const BASE = 'https://founders.kohulabs.com';
+const ENV = { GOOGLE_CLIENT_ID: 'client-kohulabs-android', GOOGLE_CLIENT_SECRET: 'shh', SESSION_SECRET: SECRET, FOUNDER_EMAILS: 'hello@kohulabs.com, ana@kohulabs.com' };
+const BASE = 'https://android.kohulabs.com';
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const idToken = (c) => `${b64({ alg: 'RS256' })}.${b64(c)}.sig`;
 const now = () => Math.floor(Date.now() / 1000);
@@ -51,11 +51,11 @@ test('status: says whether sign-in and the database are set up', async () => {
 test('sign-in: Google with PKCE on this Worker; the tab ends in the app with a code; code + verifier make a 90-day token', async () => {
   const { start, auth, back, to, seen, res, body } = await signIn();
   assert.equal(auth.searchParams.get('redirect_uri'), `${BASE}/auth/google/callback`);
-  assert.equal(auth.searchParams.get('client_id'), 'client-founders');
-  assert.match(start.headers.getSetCookie()[0], /^__Host-founders_oauth=.*HttpOnly.*Secure/);
+  assert.equal(auth.searchParams.get('client_id'), 'client-kohulabs-android');
+  assert.match(start.headers.getSetCookie()[0], /^__Host-kohulabs_android_oauth=.*HttpOnly.*Secure/);
   assert.equal(Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seen.get('code_verifier')))).toString('base64url'), auth.searchParams.get('code_challenge'));
-  assert.equal(to.protocol + to.pathname, 'com.kohulabs.founders:/signed-in');
-  assert.match(back.headers.getSetCookie()[0], /__Host-founders_oauth=; .*Max-Age=0/);
+  assert.equal(to.protocol + to.pathname, 'com.kohulabs.android:/signed-in');
+  assert.match(back.headers.getSetCookie()[0], /__Host-kohulabs_android_oauth=; .*Max-Age=0/);
   assert.equal(res.status, 200);
   assert.equal(body.email, 'hello@kohulabs.com'); assert.equal(body.name, 'João Duarte');
   assert.ok(body.expiresAt > now() + 89 * 24 * 3600);
@@ -65,11 +65,11 @@ test('sign-in: Google with PKCE on this Worker; the tab ends in the app with a c
 test('sign-in refuses: a wrong verifier, a bad challenge, someone not on the list, a cancelled or tampered sign-in, bad ID tokens', async () => {
   assert.equal((await signIn({ verifierOverride: 'x'.repeat(43) })).res.status, 400);
   assert.equal((await call('/auth/google?challenge=short')).status, 400);
-  assert.equal((await signIn({ email: 'stranger@gmail.com' })).to.href, 'com.kohulabs.founders:/signed-in?error=not_invited');
-  assert.equal((await call('/auth/google/callback?error=access_denied')).headers.get('Location'), 'com.kohulabs.founders:/signed-in?error=cancelled');
-  assert.equal((await call('/auth/google/callback?code=x&state=y')).headers.get('Location'), 'com.kohulabs.founders:/signed-in?error=failed');
+  assert.equal((await signIn({ email: 'stranger@gmail.com' })).to.href, 'com.kohulabs.android:/signed-in?error=not_invited');
+  assert.equal((await call('/auth/google/callback?error=access_denied')).headers.get('Location'), 'com.kohulabs.android:/signed-in?error=cancelled');
+  assert.equal((await call('/auth/google/callback?code=x&state=y')).headers.get('Location'), 'com.kohulabs.android:/signed-in?error=failed');
   for (const claims of [{ aud: 'other' }, { email_verified: false }, { nonce: 'nope' }, { exp: now() - 5 }]) {
-    assert.equal((await signIn({ claims })).to.href, 'com.kohulabs.founders:/signed-in?error=failed', JSON.stringify(claims));
+    assert.equal((await signIn({ claims })).to.href, 'com.kohulabs.android:/signed-in?error=failed', JSON.stringify(claims));
   }
   // A code is not a token, a token is not a code, and nothing signed with another secret counts.
   const { to, body } = await signIn();

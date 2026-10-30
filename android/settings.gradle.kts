@@ -1,4 +1,4 @@
-// Kohu Founders for Android. Build from this folder: ./gradlew assembleDebug (see README.md).
+// kohulabs-android: the Kohu Founders app. Build from this folder: ./gradlew assembleDebug (see README.md).
 pluginManagement {
     repositories {
         google()
@@ -13,5 +13,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "KohuFounders"
+rootProject.name = "kohulabs-android"
 include(":app")

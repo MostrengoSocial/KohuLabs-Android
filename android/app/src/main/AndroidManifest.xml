@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Sign-in and syncing with the cloud copy (founders.kohulabs.com). -->
+    <!-- Sign-in and syncing with the cloud copy (android.kohulabs.com). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Kō sets alarms in the phone's clock app ("Wake me at 06:45 for a run"). -->
@@ -32,12 +32,12 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Google sign-in ends here: the Worker sends the browser tab to com.kohulabs.founders:/signed-in?code=… -->
+            <!-- Google sign-in ends here: the Worker sends the browser tab to com.kohulabs.android:/signed-in?code=… -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="com.kohulabs.founders" />
+                <data android:scheme="com.kohulabs.android" />
             </intent-filter>
         </activity>
     </application>

@@ -76,6 +76,6 @@ jobs:
       - name: Keep the APK to install on a phone
         uses: actions/upload-artifact@v4
         with:
-          name: kohu-founders-apk
+          name: kohulabs-android-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30

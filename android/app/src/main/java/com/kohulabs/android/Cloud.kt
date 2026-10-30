@@ -1,4 +1,4 @@
-package com.kohulabs.founders
+package com.kohulabs.android
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -7,9 +7,9 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
 import androidx.core.content.edit
-import com.kohulabs.founders.data.FoundersDatabase
-import com.kohulabs.founders.data.Sync
-import com.kohulabs.founders.data.SyncApi
+import com.kohulabs.android.data.FoundersDatabase
+import com.kohulabs.android.data.Sync
+import com.kohulabs.android.data.SyncApi
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -26,7 +26,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * The app's link to the cloud (the Kohu Founders Worker at [BuildConfig.API_BASE], api/): who is signed in, and
+ * The app's link to the cloud (the kohulabs-android Worker at [BuildConfig.API_BASE], api/): who is signed in, and
  * when to sync. Syncs run one at a time on a background thread: when the app opens or goes to the background,
  * and a few seconds after each change.
  */
@@ -157,7 +157,7 @@ class Account(context: Context) {
     }
 
     private companion object {
-        const val ALIAS = "kohu-founders-token"
+        const val ALIAS = "kohulabs-android-token"
         const val TOKEN = "token"; const val EMAIL = "email"; const val NAME = "name"; const val EXPIRES = "expiresAt"; const val VERIFIER = "verifier"
     }
 }

@@ -1,4 +1,4 @@
-package com.kohulabs.founders
+package com.kohulabs.android
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Google sign-in, for the cloud copy: a browser tab on the Worker's /auth/google (the app's PKCE challenge
-     * goes with it), which ends at com.kohulabs.founders:/signed-in?code=… ([handleSignIn]). When the cloud is not
+     * goes with it), which ends at com.kohulabs.android:/signed-in?code=… ([handleSignIn]). When the cloud is not
      * set up yet, or unreachable, the app carries on, on this phone only.
      */
     fun startSignIn() = background.execute {
@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
 
     private fun handleSignIn(intent: Intent?) {
         val data = intent?.data ?: return
-        if (data.scheme != "com.kohulabs.founders") return
+        if (data.scheme != "com.kohulabs.android") return
         setIntent(Intent(intent).setData(null))
         val code = data.getQueryParameter("code")
         val verifier = cloud.account.pendingVerifier

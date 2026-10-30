@@ -514,7 +514,7 @@
   }
 
   // ---- boot ----
-  const STORE = 'kohu-founders';
+  const STORE = 'kohulabs-android';
   const saved = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } })();
   const save = v => { try { localStorage.setItem(STORE, JSON.stringify(v)); } catch (e) { /* private mode: nothing kept */ } };
   const props = {

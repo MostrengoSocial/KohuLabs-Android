@@ -1,4 +1,4 @@
-package com.kohulabs.founders.data
+package com.kohulabs.android.data
 
 import org.json.JSONArray
 import org.json.JSONObject

@@ -1,5 +1,5 @@
 {
-  "name": "kohu-founders-tests",
+  "name": "kohulabs-android-tests",
   "private": true,
   "type": "module",
   "description": "Browser tests for the app's screens (web/ itself has no dependencies).",

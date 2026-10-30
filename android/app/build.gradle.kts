@@ -7,17 +7,17 @@ plugins {
 }
 
 android {
-    namespace = "com.kohulabs.founders"
+    namespace = "com.kohulabs.android"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.kohulabs.founders"
+        applicationId = "com.kohulabs.android"
         minSdk = 26
         targetSdk = 36
         versionCode = 2
         versionName = "0.2.0"
-        // The Kohu Founders Worker, for sign-in and syncing (api/, wrangler.jsonc).
-        buildConfigField("String", "API_BASE", "\"https://founders.kohulabs.com\"")
+        // The kohulabs-android Worker, for sign-in and syncing (api/, wrangler.jsonc).
+        buildConfigField("String", "API_BASE", "\"https://android.kohulabs.com\"")
     }
 
     // Release builds are signed when the keystore is given in the environment (CI secrets); otherwise

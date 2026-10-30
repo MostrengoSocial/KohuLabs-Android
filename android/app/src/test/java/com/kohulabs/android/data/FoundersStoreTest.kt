@@ -1,4 +1,4 @@
-package com.kohulabs.founders.data
+package com.kohulabs.android.data
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider

@@ -1,7 +1,7 @@
-// Kohu Founders API (Cloudflare Worker): sign-in and the cloud copy for the Kohu Founders Android app (android/).
+// kohulabs-android API (Cloudflare Worker): sign-in and the cloud copy for the Kohu Founders Android app (android/).
 //
 //   GET  /auth/google?challenge=…   Google sign-in, opened by the app in a browser tab. It ends by sending the app a
-//                                   one-time code: com.kohulabs.founders:/signed-in?code=… (or ?error=…)
+//                                   one-time code: com.kohulabs.android:/signed-in?code=… (or ?error=…)
 //   GET  /auth/google/callback      Google sends the browser back here
 //   POST /api/token                 {code, verifier} → {token, email, name, expiresAt}: the app's sign-in (Bearer),
 //                                   90 days. PKCE: only the app that started the sign-in knows the verifier.
@@ -17,12 +17,12 @@ import { sync } from './sync.js';
 const OAUTH_SECONDS = 10 * 60;
 const CODE_SECONDS = 2 * 60;
 const TOKEN_SECONDS = 90 * 24 * 3600;
-const APP_REDIRECT = 'com.kohulabs.founders:/signed-in';
+const APP_REDIRECT = 'com.kohulabs.android:/signed-in';
 const MAX_SYNC_BYTES = 4 * 1024 * 1024;
 
 const configured = (env) => !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.SESSION_SECRET && String(env.SESSION_SECRET).length >= 24);
 const allowed = (email, env) => emailList(env.FOUNDER_EMAILS).includes(email);
-const flowCookie = (url) => (url.protocol === 'https:' ? '__Host-founders_oauth' : 'founders_oauth');
+const flowCookie = (url) => (url.protocol === 'https:' ? '__Host-kohulabs_android_oauth' : 'kohulabs_android_oauth');
 const clearFlow = (url) => ['Set-Cookie', cookie(flowCookie(url), '', { secure: url.protocol === 'https:', maxAge: 0, path: '/auth' })];
 const toApp = (query, url) => redirect(`${APP_REDIRECT}?${query}`, [clearFlow(url)]);
 

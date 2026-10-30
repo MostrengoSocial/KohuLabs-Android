@@ -15,7 +15,7 @@ const CLOUD_ONLY_TABLES = ['sync_counter'];
 const PHONE_ONLY_TABLES = ['outbox'];
 
 const here = new URL('.', import.meta.url);
-const roomDir = new URL('../android/app/schemas/com.kohulabs.founders.data.FoundersDatabase/', here);
+const roomDir = new URL('../android/app/schemas/com.kohulabs.android.data.FoundersDatabase/', here);
 const latest = readdirSync(roomDir).filter((f) => f.endsWith('.json')).sort((a, b) => parseInt(b) - parseInt(a))[0];
 const room = JSON.parse(readFileSync(new URL(latest, roomDir))).database;
 

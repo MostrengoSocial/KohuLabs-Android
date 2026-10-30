@@ -1,4 +1,4 @@
-package com.kohulabs.founders.data
+package com.kohulabs.android.data
 
 import android.content.Context
 import androidx.room.Room
@@ -103,7 +103,7 @@ class SyncTest {
     // Version 1 is built from Room's own record of it (schemas/…/1.json); Room checks the result matches version 2.
     @Test fun upgradingFromVersion1QueuesEverythingForTheFirstSync() {
         val file = context.getDatabasePath("upgrade.db").apply { parentFile?.mkdirs(); delete() }
-        val v1 = JSONObject(java.io.File("schemas/com.kohulabs.founders.data.FoundersDatabase/1.json").readText()).getJSONObject("database")
+        val v1 = JSONObject(java.io.File("schemas/com.kohulabs.android.data.FoundersDatabase/1.json").readText()).getJSONObject("database")
         android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(file, null).use { sql ->
             val entities = v1.getJSONArray("entities")
             for (i in 0 until entities.length()) {

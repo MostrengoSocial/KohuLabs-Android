@@ -1,4 +1,4 @@
-package com.kohulabs.founders.data
+package com.kohulabs.android.data
 
 /**
  * What happens to unfinished work when a new day starts. Plain Kotlin, no database, so it is easy to test.

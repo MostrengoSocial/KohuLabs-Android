@@ -1,6 +1,6 @@
-# Kohu Founders
+# kohulabs-android
 
-The Android app for the Kohu Labs founder, João Duarte: **Kō runs the day, you do the chunks.** Built from the
+**Kohu Founders**, the Android app for the Kohu Labs founder, João Duarte: **Kō runs the day, you do the chunks.** Built from the
 Claude Design project "Kohu Founders App" (file "Ko Phone"). Kō plans the day in 25 minute chunks across four tabs
 (General, Kohu with MCP tools, Personal and Revolut fed by you). Home is Kō roaming the screen until you tap him; then
 Focus, Today, Day map, the focus guard, the day review, meeting prep and follow-up, follow-ups, Kō's chat and voice,
@@ -15,7 +15,7 @@ and secrets.
 ```
 android/      the Android app (Kotlin): WebView shell, phone features, the database on the phone, sync
 web/          the app's screens (web/founders/), plus the files they use: Kō's renderer (js/signal.js), fonts, icons
-api/          the Cloudflare Worker (founders.kohulabs.com): Google sign-in for the app, and the cloud copy (D1)
+api/          the Cloudflare Worker (android.kohulabs.com): Google sign-in for the app, and the cloud copy (D1)
 db/           the data model: migrations/ (the cloud's tables) and check-schema.mjs
 tests/        browser tests for the screens (Playwright)
 wrangler.jsonc  the Worker's Cloudflare config
@@ -41,7 +41,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Or open `android/` in Android Studio. CI builds the same debug APK on every pull request (artifact
-`kohu-founders-apk`), which installs on a phone with "Install unknown apps" allowed. For a Play Store build,
+`kohulabs-android-apk`), which installs on a phone with "Install unknown apps" allowed. For a Play Store build,
 `./gradlew assembleRelease` (or `bundleRelease`) signs with the keystore named by `KOHU_KEYSTORE`,
 `KOHU_KEYSTORE_PASSWORD`, `KOHU_KEY_ALIAS` and `KOHU_KEY_PASSWORD`.
 
@@ -62,7 +62,7 @@ new export (the frame classes `kf-bezel`, `kf-screen`, `kf-status` and `kf-homeb
 
 ## Your data
 
-### On the phone (`android/app/src/main/java/com/kohulabs/founders/data/`)
+### On the phone (`android/app/src/main/java/com/kohulabs/android/data/`)
 
 The day lives in a database on the phone (SQLite through Room), so it works offline and survives restarts.
 
@@ -80,18 +80,18 @@ The day lives in a database on the phone (SQLite through Room), so it works offl
 - **How the screens use it:** `FoundersStore.kt` gives a day as JSON and saves changes; the WebView reaches it through
   `KohuBridge`. The current chunk's timer runs from when it started, across restarts.
 
-### In the cloud (`api/`, founders.kohulabs.com)
+### In the cloud (`api/`, android.kohulabs.com)
 
-The day is also kept in the cloud, as a backup and for other devices later: the `kohu-founders` Worker
+The day is also kept in the cloud, as a backup and for other devices later: the `kohulabs-android` Worker
 (`wrangler.jsonc`) with a D1 database (SQLite on Cloudflare, bound as `DB`).
 
 - **Setting it up** (once):
   1. Google Cloud console → APIs & Services → Credentials: an OAuth client (Web application) with the redirect URI
-     `https://founders.kohulabs.com/auth/google/callback`.
-  2. Cloudflare dashboard → Workers & Pages → the `kohu-founders` Worker → Settings → Builds: connect this
+     `https://android.kohulabs.com/auth/google/callback`.
+  2. Cloudflare dashboard → Workers & Pages → the `kohulabs-android` Worker → Settings → Builds: connect this
      repository, with the default commands (`npx wrangler deploy` for main, `npx wrangler versions upload` for other
      branches). The first deploy creates the database (no id needed: Cloudflare's automatic provisioning) and the
-     founders.kohulabs.com address.
+     android.kohulabs.com address.
   3. On that Worker, Settings → Variables and Secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and
      `SESSION_SECRET` (32+ random characters), as Secrets. Who may sign in is `FOUNDER_EMAILS` in `wrangler.jsonc`.
   On the first sync the Worker creates its tables from `db/migrations/`. `GET /api/status` says whether it is all set
@@ -105,8 +105,8 @@ The day is also kept in the cloud, as a backup and for other devices later: the 
   `updated_at` wins, on both sides. The cloud numbers every accepted change (`seq`), so the phone asks for
   "everything after N" without trusting its own clock, and long histories come in pages. Each person only sees their
   own rows (`user_id`). The app syncs when it opens, when it goes to the background, and a few seconds after changes.
-- **Looking at the data:** Cloudflare dashboard → Storage & Databases → D1 → `kohu-founders` → Console, or
-  `npx wrangler d1 execute kohu-founders --remote --command "SELECT …"`.
+- **Looking at the data:** Cloudflare dashboard → Storage & Databases → D1 → `kohulabs-android` → Console, or
+  `npx wrangler d1 execute kohulabs-android --remote --command "SELECT …"`.
 
 ## Tests
 

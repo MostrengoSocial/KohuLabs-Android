@@ -1,6 +1,6 @@
 -- Kohu Founders: the data model, as the cloud database (Cloudflare D1) will hold it.
 --
--- The phone keeps the same tables in its own database (android/app/src/main/java/com/kohulabs/founders/data/,
+-- The phone keeps the same tables in its own database (android/app/src/main/java/com/kohulabs/android/data/,
 -- Room), without user_id: there is only ever one person on a phone. db/check-schema.mjs checks that the two match.
 --
 -- Every table has the same bookkeeping columns, for syncing (step 2):
