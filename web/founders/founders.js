@@ -597,18 +597,86 @@
     // In the app, Google sign-in is real (MainActivity: a browser tab, then the cloud gives the app its token).
     renderVals() {
       const v = super.renderVals();
+      v.demo = !day;
       if (phone && typeof phone.signIn === 'function') {
         v.startOAuth = () => phone.signIn();
         const signOut = v.signOut;
         v.signOut = () => { phone.signOut(); signOut(); };
       }
+      if (day) Object.assign(v, this.honest(v));
       return v;
     }
-    // Called by the app when sign-in finished: on to the next onboarding step. account is null when the cloud is not
-    // set up yet and the app carries on, on this phone only.
+
+    // ---- the app shows only what is true ----------------------------------------------------------------------------
+    // The design fills every screen with its sample. In the app (day from the phone's database) the parts that are not
+    // built yet are hidden (demo: false in index.html) or show real numbers, and Kō only says what it knows.
+    say(en, pt) { return this.lang() === 'pt' ? pt : en; }
+    dayFacts() {
+      const list = this.chunks(), now = list.find(c => c.isNow), left = list.filter(c => !c.isDone).length;
+      const next = now ? list.slice(list.indexOf(now) + 1).find(c => !c.isDone) : null;
+      return { list, now, next, left, done: list.length - left, meetings: list.filter(c => c.group === 'meet' && !c.isDone).length };
+    }
+    weekData() {
+      if (typeof phone.week !== 'function') return null;
+      if (!this.weekCache || Date.now() - this.weekCache.at > 30_000) {
+        try { this.weekCache = { at: Date.now(), data: JSON.parse(phone.week(today)).days }; } catch (e) { this.weekCache = { at: Date.now(), data: null }; }
+      }
+      return this.weekCache.data;
+    }
+    honest(v) {
+      const say = (en, pt) => this.say(en, pt), f = this.dayFacts(), L = this.lang() === 'pt' ? 1 : 0;
+      const t = Object.create(v.t);   // the design's copy, with the parts below made true
+      const out = { t, showSynced: false };
+      t.focusKo = f.next ? say(`Up next: ${f.next.title} at ${f.next.time}.`, `A seguir: ${f.next.title} às ${f.next.time}.`) : say('This is the last chunk today.', 'É o último bloco de hoje.');
+      t.revKo = say(`You finished ${f.done} of ${f.list.length} chunks today.`, `Acabaste ${f.done} de ${f.list.length} blocos hoje.`);
+      t.alKo = say('Ask Kō for an alarm (“wake me at 6:45”) and it goes into your phone’s Clock app. Change or delete it there.', 'Pede um alarme ao Kō (“acorda-me às 6:45”) e ele vai para a app Relógio do telemóvel. Muda-o ou apaga-o lá.');
+      t.folKo = say('Unread mail from your inbox, refreshed every hour. Promotions, social and updates are left out.', 'Email por ler da tua caixa de entrada, atualizado de hora a hora. Promoções, social e atualizações ficam de fora.');
+      // Home: no focus guard yet.
+      out.homeTiles = v.homeTiles.filter(b => b.label !== v.t.hGuard);
+      // Kō: no AI yet, so a greeting from the real day and replies only for what it can really do (send()).
+      out.modelName = say('Kō · no AI yet', 'Kō · ainda sem IA');
+      out.koHint = say('Ask what’s next, add a task (“add: …”) or set an alarm.', 'Pergunta o que vem a seguir, junta uma tarefa (“junta: …”) ou marca um alarme.');
+      const hello = f.list.length ? say(`Hi. ${f.left} of ${f.list.length} chunks left today${f.meetings ? `, ${f.meetings} of them meetings` : ''}.`, `Olá. Faltam ${f.left} de ${f.list.length} blocos hoje${f.meetings ? `, ${f.meetings} deles reuniões` : ''}.`)
+        : say('Hi. Nothing planned today yet. Add a task with “add: …”.', 'Olá. Ainda nada planeado hoje. Junta uma tarefa com “junta: …”.');
+      // (scripted replies saved before this version are left out: they were the design's sample answers)
+      out.messages = v.messages.map((m, i) => i === 0 && m.isKo ? { ...m, text: hello, hasItems: false, hasTools: false } : m)
+        .filter((m, i) => i === 0 || !(this.state.messages[i] && this.state.messages[i].key));
+      out.chips = [[say('What’s next?', 'O que vem a seguir?'), true], [say('What’s today?', 'Como está o dia?'), true], [say('Add: ', 'Junta: '), false], [say('Wake me at 7:00', 'Acorda-me às 7:00'), true]]
+        .map(([label, send]) => ({ label, onClick: send ? () => this.send(label) : () => this.setState({ input: label }) }));
+      out.askAlarm = () => { this.go('ko'); this.setState({ input: say('Wake me at ', 'Acorda-me às ') }); };
+      // Follow-ups from Gmail: open the thread, or mark it done.
+      const you = FOL_YOU.filter(x => this.inMode(x.ws) && !this.state.folDone.includes(x.id));
+      const done = id => () => this.setState(s => ({ folDone: [...s.folDone, id] }));
+      out.folYou = v.folYou.map((x, i) => ({ ...x, actions: [
+        ...(you[i] && you[i].id.startsWith('gm:') ? [{ label: say('Open in Gmail', 'Abrir no Gmail'), cls: 'k-chip k-primary', onClick: () => { location.href = 'https://mail.google.com/mail/u/0/#all/' + you[i].id.slice(3); } }] : []),
+        { label: v.t.done, cls: 'k-chip', onClick: done(you[i] && you[i].id) }] }));
+      // Settings: what the app really has access to.
+      out.scopeRows = [[say('Calendar', 'Calendário'), say('Read only', 'Só leitura')], ['Gmail', say('Senders and subjects', 'Remetentes e assuntos')], [say('Session', 'Sessão'), say('90 days', '90 dias')]].map(([name, value]) => ({ name, value }));
+      // Stats: this week from the database. Spend waits for Kō's AI.
+      out.statsTabs = v.statsTabs.slice(0, 1);
+      const week = this.weekData();
+      if (week) {
+        const n = week.reduce((a, d) => a + d.done, 0), mins = week.reduce((a, d) => a + d.minutes, 0), top = Math.max(1, ...week.map(d => d.done));
+        const hours = (mins / 60).toFixed(1).replace(/\.0$/, ''), hoursL = L ? hours.replace('.', ',') : hours;
+        t.weekA = say(`${n} chunk${n === 1 ? '' : 's'} done.`, `${n} bloco${n === 1 ? '' : 's'} feito${n === 1 ? '' : 's'}.`);
+        t.weekB = say(`${hoursL} hours of focus.`, `${hoursL} horas de foco.`);
+        t.insight = say('Kō will point out patterns here once there are a few weeks of days.', 'O Kō vai apontar padrões aqui quando houver algumas semanas de dias.');
+        out.kpis = [{ label: v.t.kpi[0], value: String(n), delta: '', note: say('this week', 'esta semana') }, { label: v.t.kpi[1], value: `${hoursL}h`, delta: '', note: say('this week', 'esta semana') }];
+        out.bars = week.map((d, i) => ({ n: d.done, h: (d.done / top * 80) + 'px', bg: d.date === today ? 'var(--accent)' : 'transparent', d: v.t.days[i], dayColor: d.date === today ? 'var(--ink)' : 'var(--muted)' }));
+        const d = new Date(), thu = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() + 3 - ((d.getDay() + 6) % 7)));
+        out.weekNo = String(Math.ceil(((thu - Date.UTC(thu.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7));
+      }
+      return out;
+    }
+
+    // Called by the app when sign-in finished. In the app there is nothing else to set up yet (Kō's AI and the wake
+    // word are not built), so it goes straight to Kō's home. account is null when the cloud is not set up yet and the
+    // app carries on, on this phone only.
     cloudSignedIn(account) {
       this.cloudAccount = account;
-      if (this.scr() === 'onboarding' && this.stepV() === 0) this.setState({ oauth:null, step:1 });
+      if (this.scr() !== 'onboarding') return;
+      if (day) this.setState({ screen:'home', homeView:'ko', homeOpen:false, step:0, oauth:null });
+      else if (this.stepV() === 0) this.setState({ oauth:null, step:1 });
     }
     settingValue(k) { return k === 'lang' ? this.lang() : k === 'mode' ? this.mode() : k === 'orConnected' ? this.orV() : this.state[k]; }
     snap() {
@@ -643,8 +711,44 @@
     }
     // Kō sets the alarm on the phone too: the same request the scripted reply answers ("Done. Alarm at 06:45").
     send(text) {
-      super.send(text);
-      if (phone && text.trim() && /alarm|wake me|acorda-me/.test(text.toLowerCase())) phone.setAlarm(6, 45, this.lang() === 'pt' ? 'Corrida antes do trabalho' : 'Run before work');
+      if (!day) {
+        // The design's scripted Kō (browser preview); its alarm request also sets the phone's alarm.
+        super.send(text);
+        if (phone && text.trim() && /alarm|wake me|acorda-me/.test(text.toLowerCase())) phone.setAlarm(6, 45, this.lang() === 'pt' ? 'Corrida antes do trabalho' : 'Run before work');
+        return;
+      }
+      const q = text.trim();
+      if (!q) return;
+      const reply = this.reply(q);
+      this.setState(s => ({ messages:[...s.messages, { who:'user', text:q }], input:'', koState:'thinking' }));
+      this.later(() => this.setState(s => ({ messages:[...s.messages, { who:'ko', text:reply }], koState:'speaking' })), 500);
+      this.later(() => this.setState({ koState:'idle' }), 1600);
+    }
+    // What Kō can honestly answer without its AI: the next chunk, the day, adding a task, an alarm.
+    reply(q) {
+      const say = (en, pt) => this.say(en, pt), low = q.toLowerCase(), f = this.dayFacts();
+      const pad = n => String(n).padStart(2, '0');
+      if (/alarm|wake me|acorda|despert/.test(low)) {
+        const m = low.match(/(\d{1,2})(?:\s*[:h.]\s*(\d{2}))?/);
+        if (!m || +m[1] > 23 || +(m[2] || 0) > 59) return say('What time? For example: “wake me at 6:45”.', 'A que horas? Por exemplo: “acorda-me às 6:45”.');
+        const time = `${pad(+m[1])}:${pad(+(m[2] || 0))}`, label = say('Kō alarm', 'Alarme do Kō');
+        if (!phone.setAlarm(+m[1], +(m[2] || 0), label)) return say('I couldn’t find a clock app on this phone.', 'Não encontrei uma app de relógio neste telemóvel.');
+        this.setState(s => ({ alarms:[{ id:'k' + Date.now(), time, label:[label, label], days:[say('Once', 'Uma vez'), say('Once', 'Uma vez')], on:true, byKo:true, brief:false }, ...s.alarms] }));
+        return say(`Done: an alarm at ${time} in your Clock app.`, `Feito: um alarme às ${time} na app Relógio.`);
+      }
+      const add = q.match(/^\s*(?:add|junta|adiciona)\s*:?\s*(.+)$/i);
+      if (add) return this.feed(add[1]);
+      if (/next|now|seguir|agora/.test(low)) {
+        if (!f.now) return say('Nothing left today.', 'Já não há nada hoje.');
+        return say(`Now: ${f.now.title}, ${f.now.min} min.`, `Agora: ${f.now.title}, ${f.now.min} min.`) + (f.next ? say(` Then ${f.next.title} at ${f.next.time}.`, ` Depois ${f.next.title} às ${f.next.time}.`) : '');
+      }
+      if (/today|day|plan|hoje|dia/.test(low)) {
+        if (!f.list.length) return say('Nothing planned today yet.', 'Ainda nada planeado hoje.');
+        const items = f.list.filter(c => !c.isDone).slice(0, 6).map(c => `${c.time} ${c.title}`).join('; ');
+        return say(`${f.left} of ${f.list.length} left${f.meetings ? `, ${f.meetings} meetings` : ''}: ${items}.`, `Faltam ${f.left} de ${f.list.length}${f.meetings ? `, ${f.meetings} reuniões` : ''}: ${items}.`);
+      }
+      return say('I can’t answer that yet: my AI comes in a next update. For now I can tell you what’s next or how today looks, add a task (“add: …”) or set an alarm (“wake me at 6:45”).',
+        'Ainda não sei responder a isso: a minha IA chega numa próxima atualização. Por agora digo-te o que vem a seguir ou como está o dia, junto uma tarefa (“junta: …”) ou marco um alarme (“acorda-me às 6:45”).');
     }
     // The Android back button: close a sheet, step back a screen, then back to Kō. False lets the app close.
     back() {

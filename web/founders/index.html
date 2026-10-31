@@ -177,7 +177,7 @@
               <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap"><i style="flex:none;width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ t.feedLabel }}</span>
               <div style="display:flex;gap:6px">
                 <input value="{{ feedInput }}" onChange="{{ onFeedInput }}" onKeyDown="{{ onFeedKey }}" placeholder="{{ t.feedPh }}" style="flex:1;min-width:0;width:0;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--bg);color:var(--ink);font:inherit;font-size:14px;outline:none">
-                <button onClick="{{ feedMic }}" class="k-mono" style="flex:none;padding:0 10px;border:1px solid {{ feedMicBorder }};border-radius:var(--radius-sharp);background:{{ feedMicBg }};color:{{ feedMicColor }};cursor:pointer">{{ t.mic }}</button>
+                <sc-if value="{{ demo }}"><button onClick="{{ feedMic }}" class="k-mono" style="flex:none;padding:0 10px;border:1px solid {{ feedMicBorder }};border-radius:var(--radius-sharp);background:{{ feedMicBg }};color:{{ feedMicColor }};cursor:pointer">{{ t.mic }}</button></sc-if>
                 <button onClick="{{ addFeed }}" style="flex:none;padding:0 14px;border:0;border-radius:var(--radius-sharp);background:var(--accent);color:var(--accent-ink);font:600 14px var(--font-sans);cursor:pointer">{{ t.add }}</button>
               </div>
               <sc-if value="{{ isGeneral }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="k-mono" style="color:var(--muted);font-size:10px">{{ t.goesTo }}</span><div style="display:flex;gap:4px"><sc-for list="{{ feedTargets }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div></sc-if>
@@ -199,7 +199,7 @@
                 <button class="k-btn k-btn-primary k-btn-sm" onClick="{{ markDone }}" style="justify-content:center">{{ t.done }}</button>
                 <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ splitNow }}" style="justify-content:center">{{ t.split }}</button>
               </div>
-              <button onClick="{{ openGuard }}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:40px;padding:10px 0 0;border:0;border-top:1px solid var(--line);background:none;color:var(--ink);cursor:pointer;text-align:left"><span class="k-mono" style="display:flex;align-items:center;gap:8px;font-size:10px"><i style="flex:none;width:7px;height:7px;border-radius:50%;background:{{ guardDot }}"></i>{{ guardLine }}</span><span style="color:var(--accent)">›</span></button>
+              <sc-if value="{{ demo }}"><button onClick="{{ openGuard }}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:40px;padding:10px 0 0;border:0;border-top:1px solid var(--line);background:none;color:var(--ink);cursor:pointer;text-align:left"><span class="k-mono" style="display:flex;align-items:center;gap:8px;font-size:10px"><i style="flex:none;width:7px;height:7px;border-radius:50%;background:{{ guardDot }}"></i>{{ guardLine }}</span><span style="color:var(--accent)">›</span></button></sc-if>
             </div>
           </sc-if>
           <sc-if value="{{ dayDone }}">
@@ -384,7 +384,7 @@
 
       <sc-if value="{{ isWeek }}">
         <div style="padding:22px 22px 28px;display:grid;gap:20px">
-          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px"><span style="color:var(--accent)">44</span> · {{ t.weekEyebrow }}</span>
+          <span class="k-mono" style="color:var(--muted);margin-bottom:-8px"><span style="color:var(--accent)">{{ weekNo }}</span> · {{ t.weekEyebrow }}</span>
           <h1 style="margin:0;font-size:42px;font-weight:800;line-height:0.9;letter-spacing:-0.045em">{{ t.weekA }} <span style="color:var(--accent)">{{ t.weekB }}</span></h1>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <sc-for list="{{ kpis }}" as="k">
@@ -442,7 +442,7 @@
           </div>
           <div style="flex:none;display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line)">
             <input value="{{ input }}" onChange="{{ onInput }}" onKeyDown="{{ onKey }}" placeholder="{{ t.placeholder }}" style="flex:1;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--bg);color:var(--ink);font:inherit;font-size:14px;outline:none">
-            <button onClick="{{ toggleMic }}" class="k-mono" style="flex:none;padding:0 12px;border:1px solid {{ micBorder }};border-radius:var(--radius-sharp);background:{{ micBg }};color:{{ micColor }};cursor:pointer">{{ t.mic }}</button>
+            <sc-if value="{{ demo }}"><button onClick="{{ toggleMic }}" class="k-mono" style="flex:none;padding:0 12px;border:1px solid {{ micBorder }};border-radius:var(--radius-sharp);background:{{ micBg }};color:{{ micColor }};cursor:pointer">{{ t.mic }}</button></sc-if>
             <button onClick="{{ sendInput }}" style="flex:none;padding:0 14px;border:0;border-radius:var(--radius-sharp);background:var(--accent);color:var(--accent-ink);font:600 14px var(--font-sans);cursor:pointer">{{ t.send }}</button>
           </div>
         </div>
@@ -667,7 +667,7 @@
                   <span style="font-weight:600;font-size:15px">{{ a.label }}</span>
                   <span class="k-mono" style="color:var(--muted);font-size:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><sc-if value="{{ a.byKo }}"><i style="flex:none;width:6px;height:6px;border-radius:50%;background:var(--acid)"></i></sc-if>{{ a.meta }}</span>
                 </div>
-                <button onClick="{{ a.onToggle }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ a.border }};background:{{ a.bg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ a.knob }};width:18px;height:18px;border-radius:50%;background:{{ a.dot }};transition:left 0.2s ease"></i></button>
+                <sc-if value="{{ demo }}"><button onClick="{{ a.onToggle }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ a.border }};background:{{ a.bg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ a.knob }};width:18px;height:18px;border-radius:50%;background:{{ a.dot }};transition:left 0.2s ease"></i></button></sc-if>
               </div>
             </sc-for>
           </div>
@@ -677,7 +677,7 @@
           </div>
           <div style="display:grid;gap:8px">
             <button class="k-btn k-btn-primary" onClick="{{ askAlarm }}" style="width:100%">{{ t.alAsk }}<svg class="k-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12L12 4M5 4h7v7"></path></svg></button>
-            <button class="k-btn k-btn-ghost" onClick="{{ openRing }}" style="width:100%;justify-content:center">{{ t.alTest }}</button>
+            <sc-if value="{{ demo }}"><button class="k-btn k-btn-ghost" onClick="{{ openRing }}" style="width:100%;justify-content:center">{{ t.alTest }}</button></sc-if>
           </div>
         </div>
       </sc-if>
@@ -692,23 +692,25 @@
             <div class="k-mono" style="color:var(--accent);margin-bottom:6px">01 <span style="color:var(--muted)">· {{ t.sAccount }}</span></div>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">Google Workspace</span><span class="k-pill k-pill-live"><i></i>{{ t.connected }}</span></div>
             <sc-for list="{{ scopeRows }}" as="r"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ r.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ r.value }}</span></div></sc-for>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600">{{ t.revokeAll }}</span><button class="k-chip" onClick="{{ signOut }}" style="white-space:nowrap">{{ t.revoke }}</button></div>
+            <sc-if value="{{ demo }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600">{{ t.revokeAll }}</span><button class="k-chip" onClick="{{ signOut }}" style="white-space:nowrap">{{ t.revoke }}</button></div></sc-if>
           </div>
           <div>
             <div class="k-mono" style="color:var(--accent);margin-bottom:6px">02 <span style="color:var(--muted)">· Kō</span></div>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);flex-wrap:wrap"><span style="font-weight:600">{{ t.sMode }}</span><div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ modeChips }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+            <sc-if value="{{ demo }}">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sTools }}</span>
               <sc-if value="{{ isWork }}"><button class="k-chip" onClick="{{ openTools }}" style="white-space:nowrap">{{ toolsCountLabel }} ›</button></sc-if>
               <sc-if value="{{ isPersonal }}"><span class="k-mono" style="color:var(--muted);font-size:10px">{{ t.toolsOff }}</span></sc-if>
             </div>
+            </sc-if>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sAlarms }}</span><button class="k-chip" onClick="{{ openAlarms }}" style="white-space:nowrap">{{ alarmCountLabel }} ›</button></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sModel }}</span><span class="k-mono" style="font-size:10px;color:var(--muted);text-align:right">{{ modelName }} ›</span></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.brain }}</span><div style="display:flex;gap:4px"><sc-for list="{{ providerChips }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
-            <sc-if value="{{ isLocalProv }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="display:grid;gap:3px"><span style="font-weight:600">{{ localHost.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ localHost.meta }}</span></span><span class="k-pill k-pill-live"><i></i>{{ t.connected }}</span></div></sc-if>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.spCapLabel }}</span><div style="display:flex;gap:4px"><sc-for list="{{ capOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.wakePhrase }}</span><div style="display:flex;gap:4px"><sc-for list="{{ wakeOpts }}" as="w"><button class="{{ w.cls }}" onClick="{{ w.onClick }}" style="white-space:nowrap">{{ w.label }}</button></sc-for></div></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.tryWake }}</span><button class="k-chip" onClick="{{ openWake }}" style="white-space:nowrap">Hi Kō ›</button></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.lock }}</span><button onClick="{{ toggleLock }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ lockBorder }};background:{{ lockBg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ lockKnob }};width:18px;height:18px;border-radius:50%;background:{{ lockDot }};transition:left 0.2s ease"></i></button></div>
+            <sc-if value="{{ demo }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sModel }}</span><span class="k-mono" style="font-size:10px;color:var(--muted);text-align:right">{{ modelName }} ›</span></div></sc-if>
+            <sc-if value="{{ demo }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.brain }}</span><div style="display:flex;gap:4px"><sc-for list="{{ providerChips }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div></sc-if>
+            <sc-if value="{{ demo }}"><sc-if value="{{ isLocalProv }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="display:grid;gap:3px"><span style="font-weight:600">{{ localHost.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ localHost.meta }}</span></span><span class="k-pill k-pill-live"><i></i>{{ t.connected }}</span></div></sc-if></sc-if>
+            <sc-if value="{{ demo }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.spCapLabel }}</span><div style="display:flex;gap:4px"><sc-for list="{{ capOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div></sc-if>
+            <sc-if value="{{ demo }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.wakePhrase }}</span><div style="display:flex;gap:4px"><sc-for list="{{ wakeOpts }}" as="w"><button class="{{ w.cls }}" onClick="{{ w.onClick }}" style="white-space:nowrap">{{ w.label }}</button></sc-for></div></div></sc-if>
+            <sc-if value="{{ demo }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.tryWake }}</span><button class="k-chip" onClick="{{ openWake }}" style="white-space:nowrap">Hi Kō ›</button></div></sc-if>
+            <sc-if value="{{ demo }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.lock }}</span><button onClick="{{ toggleLock }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ lockBorder }};background:{{ lockBg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ lockKnob }};width:18px;height:18px;border-radius:50%;background:{{ lockDot }};transition:left 0.2s ease"></i></button></div></sc-if>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ t.sChunk }}</span><div style="display:flex;gap:4px"><sc-for list="{{ chunkOpts }}" as="o"><button class="{{ o.cls }}" onClick="{{ o.onClick }}" style="white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600">{{ t.sNudges }}</span><button onClick="{{ toggleNudges }}" aria-label="toggle" style="flex:none;width:46px;height:26px;border-radius:var(--radius-pill);border:1px solid {{ nudgeBorder }};background:{{ nudgeBg }};position:relative;padding:0;cursor:pointer"><i style="position:absolute;top:3px;left:{{ nudgeKnob }};width:18px;height:18px;border-radius:50%;background:{{ nudgeDot }};transition:left 0.2s ease"></i></button></div>
           </div>

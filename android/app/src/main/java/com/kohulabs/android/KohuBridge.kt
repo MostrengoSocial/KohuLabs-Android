@@ -26,6 +26,10 @@ class KohuBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun today(date: String, lang: String): String = store.today(date, lang).toString()
 
+    /** This week's chunks done and focus minutes per day, as JSON (see FoundersStore.week). */
+    @JavascriptInterface
+    fun week(date: String): String = store.week(date).toString()
+
     /** Saves a JSON list of changes (see FoundersStore.apply); returns the ids the store gave new rows. */
     @JavascriptInterface
     fun apply(ops: String): String = store.apply(JSONArray(ops)).toString().also { cloud.syncSoon() }

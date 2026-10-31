@@ -126,13 +126,78 @@ test('in the Android app: the day comes from the phone database and changes are 
   expect(ops.find((o) => o.op === 'chunk')).toMatchObject({ id: 'k2', status: 'done' });
   expect(ops.find((o) => o.op === 'nudge')).toMatchObject({ answer: 'Thursday' });
 
-  // Kō remembers the chat; a task you give him is added to the store, which names it.
+  // Kō keeps today's chat (without the design's scripted answers); a task you give him is added to the store.
   await page.getByRole('button', { name: 'General' }).first().click();
   await page.locator('nav button').nth(2).click();
-  await expect(page.getByText('Metrics section, 25 minutes.')).toBeVisible();
-  await page.getByPlaceholder('Ask Kō or give him a task').fill('renew my passport');
+  await expect(page.getByText('What’s next?', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Metrics section, 25 minutes.')).toHaveCount(0);
+  await page.getByPlaceholder('Ask Kō or give him a task').fill('add: renew my passport');
   await page.keyboard.press('Enter');
   await expect.poll(() => page.evaluate(() => window.ops.filter((o) => o.op === 'add').length)).toBe(1);
   expect((await page.evaluate(() => window.ops)).find((o) => o.op === 'add')).toMatchObject({ clientId: 'f0', ws: 'personal', title: 'Renew my passport', minutes: 25 });
   expect((await page.evaluate(() => window.ops)).filter((o) => o.op === 'setting').map((o) => o.key)).toContain('mode');
+});
+
+
+// Phase 0: in the app, nothing the design invented is shown; what is not built yet is hidden, the rest is real.
+test('in the Android app: only true things are shown, and Kō only says what it knows', async ({ page }) => {
+  await page.addInitScript(() => {
+    const day = new Date(), pad = (n) => String(n).padStart(2, '0'), today = `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+    const stored = {
+      chunks: [
+        { id: 'cal:a', ws: 'kohu', start: '09:30', minutes: 30, title: 'Board call', category: 'meet', status: 'done', startedAt: null },
+        { id: 'k2', ws: 'kohu', start: '11:00', minutes: 25, title: 'Pricing copy', category: 'fed', status: 'planned', startedAt: null },
+        { id: 'cal:b', ws: 'kohu', start: '15:00', minutes: 60, title: 'Investor sync', category: 'meet', status: 'planned', startedAt: null }
+      ],
+      goals: [], nudges: [], alarms: [], messages: [], review: null, settings: { mode: '"kohu"' }, workspaces: [],
+      followUps: [{ id: 'gm:18abc', ws: 'kohu', person: 'Ana Reis', what: 'Deck follow-up', direction: 'you', days: 1, source: 'Gmail', nudged: false }]
+    };
+    window.alarms = []; window.opened = [];
+    window.KohuAndroid = {
+      platform: () => 'android', today: (date) => JSON.stringify({ date, ...stored }), apply: () => JSON.stringify({ ids: {} }),
+      setAlarm: (h, m, label) => { window.alarms.push([h, m, label]); return true; },
+      week: () => JSON.stringify({ days: Array.from({ length: 7 }, (_, i) => ({ date: i === 2 ? today : `x${i}`, done: i === 2 ? 3 : i === 0 ? 1 : 0, minutes: i === 2 ? 90 : i === 0 ? 25 : 0 })) })
+    };
+  });
+  const nav = (i) => page.locator('nav button').nth(i);
+  await page.goto('/founders/?screen=home&homeVariant=timeline');
+
+  // Today: real chunks and meetings; no focus guard, no fake "synced from" line, no pretend mic.
+  await expect(page.getByText('Pricing copy').first()).toBeVisible();
+  await expect(page.getByText('Meeting · 60 min · Calendar')).toBeVisible();
+  await expect(page.getByText(/Focus guard/)).toHaveCount(0);
+  await expect(page.getByText(/Synced from/)).toHaveCount(0);
+
+  // Kō: a greeting from the real day, honest answers, a real alarm at the time asked.
+  await nav(2).click();
+  await expect(page.getByText('Hi. 2 of 3 chunks left today, 1 of them meetings.')).toBeVisible();
+  await expect(page.getByText('Kō · no AI yet')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mic' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'What’s next?' }).click();
+  await expect(page.getByText('Now: Pricing copy, 25 min. Then Investor sync at 15:00.')).toBeVisible();
+  const input = page.getByPlaceholder('Ask Kō or give him a task');
+  await input.fill('wake me at 6:30'); await page.keyboard.press('Enter');
+  await expect(page.getByText('Done: an alarm at 06:30 in your Clock app.')).toBeVisible();
+  expect(await page.evaluate(() => window.alarms)).toEqual([[6, 30, 'Kō alarm']]);
+  await input.fill('write the board memo'); await page.keyboard.press('Enter');
+  await expect(page.getByText(/^I can’t answer that yet/)).toBeVisible();
+
+  // Stats: this week from the database; no Spend tab.
+  await nav(1).click();
+  await expect(page.getByText('4 chunks done.')).toBeVisible();
+  await expect(page.getByText('1.9 hours of focus.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Spend' })).toHaveCount(0);
+  await expect(page.getByText('38 chunks.')).toHaveCount(0);
+
+  // Follow-ups: real Gmail threads open in Gmail.
+  await nav(3).click();
+  await page.getByRole('button', { name: 'Follow-ups' }).click();
+  await expect(page.getByText('Deck follow-up')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Draft reply' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open in Gmail' })).toBeVisible();
+
+  // Settings: only what exists.
+  await nav(4).click();
+  await expect(page.getByText('Senders and subjects')).toBeVisible();
+  for (const gone of ['Tools (MCP)', 'Wake phrases', 'Try a wake-up', 'OpenRouter key', 'Monthly cap']) await expect(page.getByText(gone, { exact: true })).toHaveCount(0);
 });
