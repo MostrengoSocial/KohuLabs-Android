@@ -143,3 +143,136 @@ test('sync pages a long history without skipping anything', async () => {
 test('routing: anything else is a JSON 404', async () => {
   for (const p of ['/', '/api/me', '/api/nope', '/auth/logout']) assert.equal((await call(p)).status, 404, p);
 });
+
+// ---- Calendar and Gmail import (google-import.js) ------------------------------------------------------------------
+import { importAll, importFor, importIfDue } from './google-import.js';
+
+const NOW = Date.parse('2026-10-31T08:00:00Z');       // Europe/Lisbon is UTC+0 on this day
+const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly', MAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.metadata';
+
+// A pretend Google: sign-in with a refresh token, refreshing it, Calendar events and Gmail messages.
+function fakeGoogle(state) {
+  return async (url, init = {}) => {
+    const u = new URL(url);
+    if (u.pathname === '/token') {
+      const p = new URLSearchParams(init.body);
+      if (p.get('grant_type') === 'refresh_token') {
+        if (state.revoked) return new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 });
+        state.refreshedWith = p.get('refresh_token');
+        return new Response(JSON.stringify({ access_token: 'at-1', scope: state.scope }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ id_token: idToken({ iss: 'https://accounts.google.com', aud: ENV.GOOGLE_CLIENT_ID, nonce: state.nonce, exp: now() + 600, email: 'hello@kohulabs.com', email_verified: true, name: 'João Duarte' }), refresh_token: 'rt-secret', scope: state.scope }), { status: 200 });
+    }
+    assert.equal(init.headers && init.headers.Authorization, 'Bearer at-1');
+    if (u.hostname === 'www.googleapis.com') return new Response(JSON.stringify({ items: state.events }), { status: state.calStatus || 200 });
+    if (u.pathname.endsWith('/messages')) {
+      assert.deepEqual(u.searchParams.getAll('labelIds'), ['INBOX', 'UNREAD', 'CATEGORY_PERSONAL']);
+      assert.equal(u.searchParams.get('q'), null, 'gmail.metadata cannot search');
+      return new Response(JSON.stringify({ messages: state.mail.map((m) => ({ id: m.id })) }), { status: 200 });
+    }
+    const m = state.mail.find((x) => u.pathname.endsWith('/' + x.id));
+    assert.equal(u.searchParams.get('format'), 'metadata');
+    return new Response(JSON.stringify({ id: m.id, threadId: m.thread, internalDate: String(NOW - 86400e3), payload: { headers: [{ name: 'From', value: m.from }, { name: 'Subject', value: m.subject }] } }), { status: 200 });
+  };
+}
+const event = (id, startIso, endIso, over = {}) => ({ id, status: 'confirmed', summary: `Meeting ${id}`, start: { dateTime: startIso }, end: { dateTime: endIso }, attendees: [{ email: 'ana@x.pt', displayName: 'Ana' }, { email: 'hello@kohulabs.com', self: true, responseStatus: 'accepted' }], hangoutLink: 'https://meet.google.com/abc', ...over });
+
+async function connected(state) {
+  const env = { ...ENV, GOOGLE_TOKEN_URL: 'https://oauth2.googleapis.com/token', DB: new FakeD1() };
+  const { verifier, challenge } = await pkce();
+  const start = await call(`/auth/google?challenge=${challenge}`, { env });
+  const auth = new URL(start.headers.get('Location'));
+  state.nonce = auth.searchParams.get('nonce');
+  globalThis.fetch = fakeGoogle(state);
+  const back = await call(`/auth/google/callback?code=abc&state=${auth.searchParams.get('state')}`, { cookie: cookieHeader(start), env });
+  const code = new URL(back.headers.get('Location')).searchParams.get('code');
+  const { token } = await (await post('/api/token', { code, verifier }, { env })).json();
+  return { env, token, auth };
+}
+const rows = (env, sql, ...args) => env.DB.db.prepare(sql).all(...args);
+
+test('import: sign-in asks for read-only Calendar and Gmail metadata, offline, and keeps the refresh token encrypted', async () => {
+  const { env, auth } = await connected({ scope: `openid email profile ${CAL_SCOPE} ${MAIL_SCOPE}`, events: [], mail: [] });
+  assert.deepEqual(auth.searchParams.get('scope').split(' '), ['openid', 'email', 'profile', CAL_SCOPE, MAIL_SCOPE]);
+  assert.equal(auth.searchParams.get('access_type'), 'offline');
+  assert.match(auth.searchParams.get('prompt'), /consent/);
+  const [acct] = rows(env, 'SELECT * FROM google_accounts');
+  assert.equal(acct.user_id, 'hello@kohulabs.com');
+  assert.ok(!acct.refresh_token.includes('rt-secret'), 'stored encrypted');
+  assert.equal(acct.last_import_at, null);
+});
+
+test('import: today’s meetings, unread mail and a day nudge reach the phone through sync; the phone’s own changes stay', async () => {
+  const state = { scope: `${CAL_SCOPE} ${MAIL_SCOPE}`, mail: [{ id: 'm1', thread: 't1', from: '"Ana Reis" <ana@vc.pt>', subject: 'Deck follow-up' }, { id: 'm2', thread: 't1', from: 'Ana Reis <ana@vc.pt>', subject: 'Re: Deck' }, { id: 'm3', thread: 't2', from: 'rui@contas.pt', subject: 'IVA T3' }],
+    events: [event('e1', '2026-10-31T09:30:00Z', '2026-10-31T10:00:00Z'), event('e2', '2026-10-31T14:00:00Z', '2026-10-31T15:00:00Z', { summary: 'Board' }),
+      event('allday', null, null, { start: { date: '2026-10-31' }, end: { date: '2026-11-01' } }), event('declined', '2026-10-31T11:00:00Z', '2026-10-31T11:30:00Z', { attendees: [{ self: true, responseStatus: 'declined' }] }),
+      event('tomorrow', '2026-11-01T09:00:00Z', '2026-11-01T10:00:00Z'), event('ooo', '2026-10-31T12:00:00Z', '2026-10-31T13:00:00Z', { eventType: 'outOfOffice' })] };
+  const { env, token } = await connected(state);
+  await post('/api/sync', { cursor: 0, changes: { settings: [{ id: 'lang', value: '"pt"', updated_at: 5, deleted: 0 }] } }, { token, env });
+  // A sync starts the import in the background (by the real clock); here it is run for a fixed morning.
+  const waits = [];
+  const r = await worker.fetch(new Request(BASE + '/api/sync', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ cursor: 0, changes: {} }) }), env, { waitUntil: (p) => waits.push(p) });
+  assert.equal(r.status, 200);
+  assert.equal(waits.length, 1);
+  await Promise.all(waits);
+  assert.ok(rows(env, 'SELECT last_import_at FROM google_accounts')[0].last_import_at > 0);
+  const res = await importFor(env, 'hello@kohulabs.com', { now: NOW });
+  assert.deepEqual(res, { ok: true, meetings: 2, emails: 2, error: undefined });
+  assert.equal(state.refreshedWith, 'rt-secret');
+
+  const pulled = await (await post('/api/sync', { cursor: 0, changes: {} }, { token, env })).json();
+  assert.deepEqual(pulled.changes.chunks.filter((c) => c.date === '2026-10-31').map((c) => [c.id, c.date, c.start, c.minutes, c.category, c.workspace_id]),
+    [['cal:e1', '2026-10-31', '09:30', 30, 'meet', 'kohu'], ['cal:e2', '2026-10-31', '14:00', 60, 'meet', 'kohu']]);
+  assert.deepEqual(JSON.parse(pulled.changes.meetings[0].prep), { attendees: ['Ana'], link: 'https://meet.google.com/abc', location: null, organizer: null });
+  assert.deepEqual(pulled.changes.follow_ups.map((f) => [f.id, f.person, f.what, f.direction, f.source, f.since]),
+    [['gm:t1', 'Ana Reis', 'Deck follow-up', 'you', 'Gmail', '2026-10-30'], ['gm:t2', 'rui@contas.pt', 'IVA T3', 'you', 'Gmail', '2026-10-30']]);
+  const nudge = pulled.changes.nudges.find((n) => n.id === 'brief:2026-10-31');
+  assert.equal(nudge.title, 'Hoje: 2 reuniões, 2 emails à espera');
+  assert.match(nudge.body, /^A primeira às 09:30: Meeting e1\./);
+
+  // The phone marks the first meeting done; then the event is renamed and the second one is cancelled.
+  const done = { ...pulled.changes.chunks.find((c) => c.id === 'cal:e1'), status: 'done', updated_at: Date.now() + 1000 };
+  await post('/api/sync', { cursor: pulled.cursor, changes: { chunks: [done] } }, { token, env });
+  state.events = [event('e1', '2026-10-31T09:30:00Z', '2026-10-31T10:00:00Z', { summary: 'Renamed' })];
+  state.mail = state.mail.filter((m) => m.thread === 't2');                 // Ana's thread was read
+  await importFor(env, 'hello@kohulabs.com', { now: NOW + 3600e3 });
+  const c = Object.fromEntries(rows(env, "SELECT id, title, status, deleted FROM chunks WHERE id LIKE 'cal:%'").map((x) => [x.id, x]));
+  assert.deepEqual([c['cal:e1'].title, c['cal:e1'].status, c['cal:e1'].deleted], ['Renamed', 'done', 0]);
+  assert.equal(c['cal:e2'].deleted, 1);
+  assert.deepEqual(rows(env, "SELECT id, status FROM follow_ups ORDER BY id").map((f) => [f.id, f.status]), [['gm:t1', 'done'], ['gm:t2', 'open']]);
+  assert.equal(rows(env, "SELECT title FROM nudges WHERE id = 'brief:2026-10-31'")[0].title, 'Hoje: 1 reunião, 1 email à espera');
+
+  // An unchanged import changes nothing, so phones have nothing new to pull.
+  const before = rows(env, 'SELECT seq FROM sync_counter')[0].seq;
+  const cursor = (await (await post('/api/sync', { cursor: 0, changes: {} }, { token, env })).json()).cursor;
+  await importFor(env, 'hello@kohulabs.com', { now: NOW + 7200e3 });
+  assert.deepEqual((await (await post('/api/sync', { cursor, changes: {} }, { token, env })).json()).changes, {});
+  assert.ok(rows(env, 'SELECT seq FROM sync_counter')[0].seq >= before);
+});
+
+test('import: only what was granted, a revoked token stops it, and the schedule runs everyone', async () => {
+  const state = { scope: CAL_SCOPE, events: [event('e1', '2026-10-31T09:30:00Z', '2026-10-31T10:00:00Z')], mail: [] };
+  const { env } = await connected(state);
+  const res = await importFor(env, 'hello@kohulabs.com', { now: NOW });
+  assert.equal(res.emails, 0);
+  assert.equal(rows(env, 'SELECT COUNT(*) AS n FROM follow_ups')[0].n, 0, 'no Gmail without its scope');
+  assert.equal(rows(env, "SELECT title FROM nudges WHERE id = 'brief:2026-10-31'")[0].title, 'Today: 1 meeting, 0 emails waiting');
+  // Due again only after 50 minutes.
+  assert.equal(await importIfDue(env, 'hello@kohulabs.com', NOW + 10 * 60e3), null);
+  assert.ok(await importIfDue(env, 'hello@kohulabs.com', NOW + 60 * 60e3));
+  // Calendar API off: the error is kept, nothing is deleted.
+  state.calStatus = 403;
+  assert.match((await importFor(env, 'hello@kohulabs.com', { now: NOW + 2 * 3600e3 })).error, /calendar 403/);
+  assert.equal(rows(env, "SELECT deleted FROM chunks WHERE id = 'cal:e1'")[0].deleted, 0);
+  // Access removed in Google: marked for a new sign-in, skipped by the schedule and by syncs.
+  state.revoked = true;
+  assert.equal((await importFor(env, 'hello@kohulabs.com', { now: NOW + 3 * 3600e3 })).error, 'reauth');
+  assert.equal(await importIfDue(env, 'hello@kohulabs.com', NOW + 9 * 3600e3), null);
+  assert.deepEqual(await importAll(env, NOW + 9 * 3600e3), []);
+  // The scheduled handler.
+  state.revoked = false;
+  env.DB.db.prepare("UPDATE google_accounts SET last_error = NULL").run();
+  const waits = [];
+  await worker.scheduled({}, env, { waitUntil: (p) => waits.push(p) });
+  assert.equal((await Promise.all(waits))[0].length, 1);
+});

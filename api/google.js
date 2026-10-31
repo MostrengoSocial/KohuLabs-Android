@@ -66,9 +66,10 @@ export const googleConfig = (env) => ({
 
 /**
  * Finishes Google sign-in: trades the authorization code (with the PKCE verifier) for tokens and checks the ID
- * token's claims. Returns the claims, or null when anything is off.
+ * token's claims. Returns { claims, tokens } (tokens may include a refresh_token when offline access was granted),
+ * or null when anything is off.
  */
-export async function googleClaims(c, { code, verifier, nonce, redirectUri }) {
+export async function googleSignIn(c, { code, verifier, nonce, redirectUri }) {
   let tokens;
   try {
     const res = await fetch(c.tokenUrl, {
@@ -86,5 +87,40 @@ export async function googleClaims(c, { code, verifier, nonce, redirectUri }) {
   const now = Math.floor(Date.now() / 1000);
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!c.issuers.includes(claims.iss) || !aud.includes(c.googleId) || claims.nonce !== nonce || !(claims.exp > now) || claims.email_verified !== true || !claims.email) return null;
-  return claims;
+  return { claims, tokens };
+}
+
+/**
+ * A fresh access token from a stored refresh token. Returns { accessToken, scope }, or { error } where 'revoked'
+ * means the person must sign in again (they removed access, or the token expired).
+ */
+export async function refreshAccess(c, refreshToken) {
+  let res;
+  try {
+    res = await fetch(c.tokenUrl, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: c.googleId, client_secret: c.googleSecret, refresh_token: refreshToken, grant_type: 'refresh_token' }),
+    });
+  } catch (_) { return { error: 'network' }; }
+  const body = await res.json().catch(() => ({}));
+  if (res.ok && body.access_token) return { accessToken: body.access_token, scope: body.scope || '' };
+  return { error: body.error === 'invalid_grant' ? 'revoked' : 'refresh_failed' };
+}
+
+// ---- secrets at rest: AES-GCM, with a key derived from SESSION_SECRET (HKDF), so no extra secret to manage ----------
+async function sealKey(secret) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(secret), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: enc.encode('kohulabs-android'), info: enc.encode('google-refresh-token') },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+export async function seal(text, secret) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await sealKey(secret), enc.encode(text));
+  return `${b64url(iv)}.${b64url(data)}`;
+}
+export async function unseal(sealed, secret) {
+  try {
+    const [iv, data] = String(sealed).split('.').map(unb64url);
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await sealKey(secret), data));
+  } catch (_) { return null; }       // a changed SESSION_SECRET: the person signs in again
 }

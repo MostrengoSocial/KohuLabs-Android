@@ -34,6 +34,12 @@ export async function migrate(db) {
   migrated = db;
 }
 
+/** Reserves n seqs for a person's next changes; returns the last one (the block is top - n + 1 … top). */
+export async function reserve(db, userId, n) {
+  return (await db.prepare('INSERT INTO sync_counter (user_id, seq) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET seq = seq + excluded.seq RETURNING seq')
+    .bind(userId, n).all()).results[0].seq;
+}
+
 // ---- checks --------------------------------------------------------------------------------------------------------
 const okValue = (v) => v === null || typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v)) || typeof v === 'boolean';
 function cleanRow(table, row) {
@@ -70,9 +76,7 @@ export async function sync(db, userId, body) {
 
   // Push: reserve seqs for these rows, then upsert them (newest updated_at wins).
   if (rows.length) {
-    const top = (await db.prepare('INSERT INTO sync_counter (user_id, seq) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET seq = seq + excluded.seq RETURNING seq')
-      .bind(userId, rows.length).all()).results[0].seq;
-    let seq = top - rows.length;
+    let seq = (await reserve(db, userId, rows.length)) - rows.length;
     const statements = rows.map(([table, row]) => {
       const cols = TABLES[table];
       const sql = `INSERT INTO ${table} (user_id, seq, ${cols.join(', ')}) VALUES (?, ?, ${cols.map(() => '?').join(', ')}) ` +

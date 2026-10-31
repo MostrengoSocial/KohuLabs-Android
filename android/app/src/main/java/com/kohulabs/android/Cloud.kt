@@ -61,6 +61,11 @@ class Cloud private constructor(context: Context) {
         soon = worker.schedule({ syncNow() }, 8, TimeUnit.SECONDS)
     }
 
+    /** Syncs once, [seconds] from now (after sign-in: by then the cloud has imported Calendar and Gmail). */
+    fun syncAfter(seconds: Long, done: (Sync.Result?) -> Unit) {
+        worker.schedule({ syncNow(done) }, seconds, TimeUnit.SECONDS)
+    }
+
     fun signOut() {
         account.clear()
         worker.execute { sync.reset() }

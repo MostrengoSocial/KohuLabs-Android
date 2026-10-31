@@ -4,14 +4,14 @@
 //
 // 1. The phone's database (Room, android/app/schemas/) and the cloud one (db/migrations/, D1) have the same tables
 //    and columns, with the same types and NOT NULL. Only the cloud has user_id and seq (and sync_counter); only the
-//    phone has its outbox (changes not uploaded yet).
+//    phone has its outbox (changes not uploaded yet). google_accounts (Google sign-in for the import) is cloud only too.
 // 2. api/migrations.js, which the Worker runs to set up D1 and uses to know each table's columns, matches
 //    db/migrations/. Workers cannot read .sql files, so it is generated from them.
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 
 const CLOUD_ONLY_COLUMNS = ['user_id', 'seq'];
-const CLOUD_ONLY_TABLES = ['sync_counter'];
+const CLOUD_ONLY_TABLES = ['sync_counter', 'google_accounts'];
 const PHONE_ONLY_TABLES = ['outbox'];
 
 const here = new URL('.', import.meta.url);

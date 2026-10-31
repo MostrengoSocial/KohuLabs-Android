@@ -560,6 +560,8 @@
     const now = new Date(), tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const long = (l, x) => l === 'pt' ? `${NAMES.pt.dl[x.getDay()]}, ${x.getDate()} de ${NAMES.pt.ml[x.getMonth()]}` : `${NAMES.en.dl[x.getDay()]}, ${x.getDate()} ${NAMES.en.ml[x.getMonth()]}`;
     for (const l of ['en', 'pt']) Object.assign(T[l], { date:`${NAMES[l].d[now.getDay()]} ${now.getDate()} ${NAMES[l].m[now.getMonth()]}`, lockDate:long(l, now), ringDate:long(l, tomorrow) });
+    // Meetings imported from Calendar (api/google-import.js); not tappable (the design's meeting screen is its sample).
+    GROUPS.meet = ['Meeting', 'Reunião']; SOURCE.meet = 'Calendar';
     const rows = ws => day.chunks.filter(c => c.ws === ws).map(c => { if (!GROUPS[c.category]) GROUPS[c.category] = [c.category, c.category]; return [c.id, c.start, c.minutes, c.title, c.title, c.category]; });
     fill(DAY, rows('kohu')); fill(DAY_P, rows('personal')); fill(DAY_R, rows('revolut'));
     for (const ws of ['kohu', 'personal', 'revolut']) GOALS[ws] = day.goals.filter(g => g.ws === ws).map(g => [g.id, g.title, g.title]);

@@ -49,6 +49,12 @@ export const MIGRATIONS = [
       "CREATE INDEX settings_by_seq ON settings (user_id, seq)",
       "CREATE TABLE sync_counter ( user_id TEXT PRIMARY KEY, seq INTEGER NOT NULL DEFAULT 0 )"
     ]
+  },
+  {
+    "name": "0003_google.sql",
+    "statements": [
+      "CREATE TABLE google_accounts ( user_id TEXT PRIMARY KEY, refresh_token TEXT NOT NULL, scopes TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL, last_import_at INTEGER, last_import_date TEXT, last_error TEXT )"
+    ]
   }
 ];
 

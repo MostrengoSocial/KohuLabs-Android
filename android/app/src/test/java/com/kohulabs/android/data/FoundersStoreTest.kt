@@ -74,6 +74,28 @@ class FoundersStoreTest {
         assertEquals("\"pt\"", day.getJSONObject("settings").getString("lang"))
     }
 
+    @Test fun theSampleDayGoesOnceTheFirstRealDayArrivesFromGoogle() {
+        store.today("2026-10-29", "en")
+        ops(op("add", "clientId" to "f0", "ws" to "personal", "title" to "Renew my passport", "minutes" to 25, "start" to "20:30", "date" to "2026-10-29"))
+        val sql = db.openHelper.writableDatabase
+        fun count(table: String) = db.query(androidx.sqlite.db.SimpleSQLiteQuery("SELECT COUNT(*) FROM $table WHERE deleted = 0")).use { it.moveToFirst(); it.getInt(0) }
+        // Nothing from Google yet: the sample stays.
+        store.today("2026-10-29", "en")
+        assertEquals(22, count("chunks"))
+        // What a sync brings down from the cloud's import (written straight to SQLite, as Sync does).
+        sql.execSQL("INSERT INTO chunks (id, task_id, workspace_id, date, start, minutes, title, category, status, updated_at, deleted) VALUES ('cal:e1', 'cal:e1', 'kohu', '2026-10-29', '09:30', 30, 'Board', 'meet', 'planned', 5, 0)")
+        sql.execSQL("INSERT INTO nudges (id, kind, tone, time_label, title, body, actions, created_at, updated_at, deleted) VALUES ('brief:2026-10-29', 'Today', 'info', '08:00', 'Today: 1 meeting', '…', '[\"OK\"]', 5, 5, 0)")
+        val day = store.today("2026-10-29", "en")
+        assertEquals(listOf("Board", "Renew my passport"), chunks(day).map { it.getString("title") }.sorted())
+        assertEquals(0, day.getJSONArray("goals").length())
+        assertEquals(listOf("brief:2026-10-29"), day.getJSONArray("nudges").objects().map { it.getString("id") })
+        assertEquals(0, day.getJSONArray("followUps").length() + day.getJSONArray("alarms").length())
+        // The deletions go to the cloud, and it happens once: a sample goal title added later stays.
+        assertTrue(db.dao().outbox(500).any { it.tableName == "chunks" && it.rowId == "c1" })
+        sql.execSQL("INSERT INTO goals (id, workspace_id, date, title, done, updated_at, deleted) VALUES ('mine', 'kohu', '2026-10-29', 'Inbox to zero', 0, 9, 0)")
+        assertEquals(1, store.today("2026-10-29", "en").getJSONArray("goals").length())
+    }
+
     @Test fun theNextDayCarriesUnfinishedWorkAsTheReviewSaid() {
         store.today("2026-10-29", "en")
         ops(op("review", "date" to "2026-10-29", "feel" to 2, "slips" to JSONObject().put("c8", DayPlanner.DROP).put("c7", DayPlanner.SPLIT)))

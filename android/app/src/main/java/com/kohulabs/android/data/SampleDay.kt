@@ -81,6 +81,17 @@ object SampleDay {
         F("o3", "revolut", "Your manager", "OKR feedback" to "Feedback dos OKR", 1, null, "them"),
     )
 
+    /**
+     * What the sample day put on the phone, to clear it once real data arrives (FoundersStore): its tasks and their
+     * chunks (task ids start with t-, carried and split copies keep them), and these nudges, follow-ups, alarms and
+     * goal titles (carried goals get new ids but keep their title).
+     */
+    const val TASK_PREFIX = "t-"
+    val NUDGE_IDS = NUDGES.map { it.id }
+    val FOLLOW_UP_IDS = FOLLOW_UPS.map { it.id }
+    val ALARM_IDS = listOf("a1", "a2", "a3")
+    val GOAL_TITLES = GOALS.flatMap { listOf(it[2], it[3]) }
+
     class Rows(
         val workspaces: List<Workspace>, val tasks: List<Task>, val chunks: List<Chunk>, val goals: List<Goal>,
         val nudges: List<Nudge>, val followUps: List<FollowUp>, val alarms: List<Alarm>,

@@ -19,6 +19,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
+import com.kohulabs.android.data.Sync
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
@@ -141,7 +142,10 @@ class MainActivity : ComponentActivity() {
                 cloud.account.save(r.getString("token"), r.getString("email"), r.optString("name", r.getString("email")), r.getLong("expiresAt"))
                 cloud.account.pendingVerifier = null
                 signedIn(JSONObject().put("email", r.getString("email")).put("name", r.optString("name")), null)
-                cloud.syncNow { res -> if (res != null && res.pulled > 0) runOnUiThread { web.reload() } }
+                val reload: (Sync.Result?) -> Unit = { res -> if (res != null && res.pulled > 0) runOnUiThread { web.reload() } }
+                cloud.syncNow(reload)
+                // The first sync starts the Calendar and Gmail import in the cloud; this one brings the real day in.
+                cloud.syncAfter(20, reload)
             } catch (e: Exception) {
                 signedIn(null, if (e is Api.HttpError && e.code == 403) R.string.cloud_not_invited else R.string.cloud_sign_in_failed, stay = true)
             }
