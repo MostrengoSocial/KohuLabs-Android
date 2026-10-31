@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Kohu UI dark tokens: bg and accent -->
+    <color name="kohu_bg">#090B11</color>
+    <color name="kohu_accent">#5B7BFF</color>
+</resources>

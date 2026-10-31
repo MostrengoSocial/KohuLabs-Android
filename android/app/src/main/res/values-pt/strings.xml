@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cloud_unavailable">A cloud ainda não está configurada. Por agora, o Kohu Founders guarda o teu dia neste telemóvel.</string>
+    <string name="cloud_sign_in_failed">O início de sessão não terminou. Tenta outra vez.</string>
+    <string name="cloud_not_invited">Esta conta Google não está na lista do Kohu Founders.</string>
+</resources>

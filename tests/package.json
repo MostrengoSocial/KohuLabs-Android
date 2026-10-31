@@ -1,0 +1,12 @@
+{
+  "name": "kohulabs-android-tests",
+  "private": true,
+  "type": "module",
+  "description": "Browser tests for the app's screens (web/ itself has no dependencies).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
