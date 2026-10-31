@@ -53,6 +53,8 @@ test('sign-in: Google with PKCE on this Worker; the tab ends in the app with a c
   assert.equal(auth.searchParams.get('redirect_uri'), `${BASE}/auth/google/callback`);
   assert.equal(auth.searchParams.get('client_id'), 'client-kohulabs-android');
   assert.match(start.headers.getSetCookie()[0], /^__Host-kohulabs_android_oauth=.*HttpOnly.*Secure/);
+  // Browsers only keep a __Host- cookie with Path=/ (and no Domain); any other path and it is silently dropped.
+  for (const c of [start.headers.getSetCookie()[0], back.headers.getSetCookie()[0]]) { assert.match(c, /; Path=\/;/); assert.doesNotMatch(c, /Domain=/i); }
   assert.equal(Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seen.get('code_verifier')))).toString('base64url'), auth.searchParams.get('code_challenge'));
   assert.equal(to.protocol + to.pathname, 'com.kohulabs.android:/signed-in');
   assert.match(back.headers.getSetCookie()[0], /__Host-kohulabs_android_oauth=; .*Max-Age=0/);
