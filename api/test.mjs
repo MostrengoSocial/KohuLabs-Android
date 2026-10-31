@@ -166,13 +166,13 @@ function fakeGoogle(state) {
     assert.equal(init.headers && init.headers.Authorization, 'Bearer at-1');
     if (u.hostname === 'www.googleapis.com') return new Response(JSON.stringify({ items: state.events }), { status: state.calStatus || 200 });
     if (u.pathname.endsWith('/messages')) {
-      assert.deepEqual(u.searchParams.getAll('labelIds'), ['INBOX', 'UNREAD', 'CATEGORY_PERSONAL']);
+      assert.deepEqual(u.searchParams.getAll('labelIds'), ['INBOX', 'UNREAD']);
       assert.equal(u.searchParams.get('q'), null, 'gmail.metadata cannot search');
       return new Response(JSON.stringify({ messages: state.mail.map((m) => ({ id: m.id })) }), { status: 200 });
     }
     const m = state.mail.find((x) => u.pathname.endsWith('/' + x.id));
     assert.equal(u.searchParams.get('format'), 'metadata');
-    return new Response(JSON.stringify({ id: m.id, threadId: m.thread, internalDate: String(NOW - 86400e3), payload: { headers: [{ name: 'From', value: m.from }, { name: 'Subject', value: m.subject }] } }), { status: 200 });
+    return new Response(JSON.stringify({ id: m.id, threadId: m.thread, internalDate: String(NOW - 86400e3), labelIds: m.labels || ['INBOX', 'UNREAD'], payload: { headers: [{ name: 'From', value: m.from }, { name: 'Subject', value: m.subject }] } }), { status: 200 });
   };
 }
 const event = (id, startIso, endIso, over = {}) => ({ id, status: 'confirmed', summary: `Meeting ${id}`, start: { dateTime: startIso }, end: { dateTime: endIso }, attendees: [{ email: 'ana@x.pt', displayName: 'Ana' }, { email: 'hello@kohulabs.com', self: true, responseStatus: 'accepted' }], hangoutLink: 'https://meet.google.com/abc', ...over });
@@ -203,10 +203,11 @@ test('import: sign-in asks for read-only Calendar and Gmail metadata, offline, a
 });
 
 test('import: today’s meetings, unread mail and a day nudge reach the phone through sync; the phone’s own changes stay', async () => {
-  const state = { scope: `${CAL_SCOPE} ${MAIL_SCOPE}`, mail: [{ id: 'm1', thread: 't1', from: '"Ana Reis" <ana@vc.pt>', subject: 'Deck follow-up' }, { id: 'm2', thread: 't1', from: 'Ana Reis <ana@vc.pt>', subject: 'Re: Deck' }, { id: 'm3', thread: 't2', from: 'rui@contas.pt', subject: 'IVA T3' }],
+  const state = { scope: `${CAL_SCOPE} ${MAIL_SCOPE}`, mail: [{ id: 'm1', thread: 't1', from: '"Ana Reis" <ana@vc.pt>', subject: 'Deck follow-up' }, { id: 'm2', thread: 't1', from: 'Ana Reis <ana@vc.pt>', subject: 'Re: Deck' }, { id: 'm3', thread: 't2', from: 'rui@contas.pt', subject: 'IVA T3' }, { id: 'm4', thread: 't3', from: 'deals@shop.pt', subject: '50% off', labels: ['INBOX', 'UNREAD', 'CATEGORY_PROMOTIONS'] }],
     events: [event('e1', '2026-10-31T09:30:00Z', '2026-10-31T10:00:00Z'), event('e2', '2026-10-31T14:00:00Z', '2026-10-31T15:00:00Z', { summary: 'Board' }),
       event('allday', null, null, { start: { date: '2026-10-31' }, end: { date: '2026-11-01' } }), event('declined', '2026-10-31T11:00:00Z', '2026-10-31T11:30:00Z', { attendees: [{ self: true, responseStatus: 'declined' }] }),
-      event('tomorrow', '2026-11-01T09:00:00Z', '2026-11-01T10:00:00Z'), event('ooo', '2026-10-31T12:00:00Z', '2026-10-31T13:00:00Z', { eventType: 'outOfOffice' })] };
+      event('tomorrow', '2026-11-01T09:00:00Z', '2026-11-01T10:00:00Z'), event('ooo', '2026-10-31T12:00:00Z', '2026-10-31T13:00:00Z', { eventType: 'outOfOffice' }),
+      event('flight', '2026-10-31T18:00:00Z', '2026-10-31T20:30:00Z', { eventType: 'fromGmail', summary: 'Flight to Porto', attendees: [] })] };
   const { env, token } = await connected(state);
   await post('/api/sync', { cursor: 0, changes: { settings: [{ id: 'lang', value: '"pt"', updated_at: 5, deleted: 0 }] } }, { token, env });
   // A sync starts the import in the background (by the real clock); here it is run for a fixed morning.
@@ -217,17 +218,17 @@ test('import: today’s meetings, unread mail and a day nudge reach the phone th
   await Promise.all(waits);
   assert.ok(rows(env, 'SELECT last_import_at FROM google_accounts')[0].last_import_at > 0);
   const res = await importFor(env, 'hello@kohulabs.com', { now: NOW });
-  assert.deepEqual(res, { ok: true, meetings: 2, emails: 2, error: undefined });
+  assert.deepEqual(res, { ok: true, meetings: 3, emails: 2, error: undefined });
   assert.equal(state.refreshedWith, 'rt-secret');
 
   const pulled = await (await post('/api/sync', { cursor: 0, changes: {} }, { token, env })).json();
   assert.deepEqual(pulled.changes.chunks.filter((c) => c.date === '2026-10-31').map((c) => [c.id, c.date, c.start, c.minutes, c.category, c.workspace_id]),
-    [['cal:e1', '2026-10-31', '09:30', 30, 'meet', 'kohu'], ['cal:e2', '2026-10-31', '14:00', 60, 'meet', 'kohu']]);
+    [['cal:e1', '2026-10-31', '09:30', 30, 'meet', 'kohu'], ['cal:e2', '2026-10-31', '14:00', 60, 'meet', 'kohu'], ['cal:flight', '2026-10-31', '18:00', 150, 'meet', 'kohu']]);
   assert.deepEqual(JSON.parse(pulled.changes.meetings[0].prep), { attendees: ['Ana'], link: 'https://meet.google.com/abc', location: null, organizer: null });
   assert.deepEqual(pulled.changes.follow_ups.map((f) => [f.id, f.person, f.what, f.direction, f.source, f.since]),
     [['gm:t1', 'Ana Reis', 'Deck follow-up', 'you', 'Gmail', '2026-10-30'], ['gm:t2', 'rui@contas.pt', 'IVA T3', 'you', 'Gmail', '2026-10-30']]);
   const nudge = pulled.changes.nudges.find((n) => n.id === 'brief:2026-10-31');
-  assert.equal(nudge.title, 'Hoje: 2 reuniões, 2 emails à espera');
+  assert.equal(nudge.title, 'Hoje: 3 reuniões, 2 emails à espera');
   assert.match(nudge.body, /^A primeira às 09:30: Meeting e1\./);
 
   // The phone marks the first meeting done; then the event is renamed and the second one is cancelled.
