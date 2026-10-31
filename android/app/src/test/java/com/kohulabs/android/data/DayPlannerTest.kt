@@ -33,6 +33,11 @@ class DayPlannerTest {
         assertEquals(emptyList<Chunk>(), r.changed)
     }
 
+    @Test fun meetingsStayOnTheirDay() {
+        val meeting = chunk("cal:e1").copy(category = DayPlanner.MEETING)
+        assertEquals(emptyList<Chunk>(), DayPlanner.rollover("2026-10-30", listOf(meeting), { emptyMap() }, emptyList(), 9, ids).changed)
+    }
+
     @Test fun unfinishedGoalsCarryOver() {
         val goals = listOf(Goal("g1", "kohu", "2026-10-29", "Inbox to zero", done = false, updatedAt = 0), Goal("g2", "kohu", "2026-10-29", "Run", done = true, updatedAt = 0))
         val r = DayPlanner.rollover("2026-10-30", emptyList(), { emptyMap() }, goals, 9, ids)

@@ -1,5 +1,6 @@
 package com.kohulabs.android.data
 
+import androidx.sqlite.db.SimpleSQLiteQuery
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -22,6 +23,7 @@ class FoundersStore(
     /** The day as the screens need it. [date] is 'YYYY-MM-DD' on the phone; [lang] (en | pt) is used to seed. */
     fun today(date: String, lang: String): JSONObject = db.runInTransaction<JSONObject> {
         seedIfEmpty(date, lang)
+        clearSampleOnceRealDataArrives()
         rollOver(date)
         snapshot(date)
     }
@@ -117,6 +119,30 @@ class FoundersStore(
         saveSetting(Setting(ROLLED_TO, JSONObject.quote(date), now))
     }
 
+    /**
+     * The sample day goes once the first real day has come in from Google (the cloud's import writes a brief:… nudge
+     * each day it runs). Its rows are marked deleted and queued, so the cloud and other phones drop them too.
+     */
+    private fun clearSampleOnceRealDataArrives() {
+        if (dao.setting(SAMPLE_CLEARED) != null) return
+        val sql = db.openHelper.writableDatabase
+        val imported = db.query(SimpleSQLiteQuery("SELECT 1 FROM nudges WHERE id LIKE 'brief:%' LIMIT 1")).use { it.moveToFirst() }
+        if (!imported) return
+        val now = clock()
+        fun gone(table: String, where: String, args: List<Any>) {
+            sql.execSQL("INSERT OR REPLACE INTO outbox (table_name, row_id, queued_at) SELECT '$table', id, $now FROM $table WHERE deleted = 0 AND ($where)", args.toTypedArray())
+            sql.execSQL("UPDATE $table SET deleted = 1, updated_at = $now WHERE deleted = 0 AND ($where)", args.toTypedArray())
+        }
+        fun ids(list: List<String>) = list.joinToString { "?" }
+        gone("tasks", "id LIKE ?", listOf(SampleDay.TASK_PREFIX + "%"))
+        gone("chunks", "task_id LIKE ?", listOf(SampleDay.TASK_PREFIX + "%"))
+        gone("goals", "title IN (${ids(SampleDay.GOAL_TITLES)})", SampleDay.GOAL_TITLES)
+        gone("nudges", "id IN (${ids(SampleDay.NUDGE_IDS)})", SampleDay.NUDGE_IDS)
+        gone("follow_ups", "id IN (${ids(SampleDay.FOLLOW_UP_IDS)})", SampleDay.FOLLOW_UP_IDS)
+        gone("alarms", "id IN (${ids(SampleDay.ALARM_IDS)})", SampleDay.ALARM_IDS)
+        saveSetting(Setting(SAMPLE_CLEARED, "true", now))
+    }
+
     /** Once per new day: carry unfinished chunks and goals over (see [DayPlanner]). */
     private fun rollOver(date: String) {
         val last = dao.setting(ROLLED_TO)?.value?.let { JSONArray("[$it]").getString(0) }
@@ -163,7 +189,7 @@ class FoundersStore(
                 JSONObject().put("who", it.who).put("ws", it.workspaceId ?: JSONObject.NULL).put("text", it.text ?: JSONObject.NULL).put("key", it.replyKey ?: JSONObject.NULL)
             }))
             .put("review", dao.review(date)?.let { JSONObject().put("feel", it.feel ?: JSONObject.NULL).put("slips", JSONObject(it.slips)) } ?: JSONObject.NULL)
-            .put("settings", JSONObject().apply { dao.settings().filter { it.id != ROLLED_TO }.forEach { put(it.id, it.value) } })
+            .put("settings", JSONObject().apply { dao.settings().filter { it.id != ROLLED_TO && it.id != SAMPLE_CLEARED }.forEach { put(it.id, it.value) } })
     }
 
     private fun slipsOf(json: String): Map<String, Int> {
@@ -175,6 +201,7 @@ class FoundersStore(
 
     companion object {
         private const val ROLLED_TO = "rolledTo"
+        private const val SAMPLE_CLEARED = "sampleCleared"
         const val SAMPLE_UPDATED_AT = 1L
 
         /** A UUID that never ends in a or b: the screens read a trailing a/b as the half of a split chunk. */

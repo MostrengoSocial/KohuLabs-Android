@@ -7,12 +7,14 @@ package com.kohulabs.android.data
  * (Slipped · what now?): 0 Tomorrow (the default, also when there was no review), 1 Split, 2 Drop.
  * A carried chunk keeps its time slot and links back to the original (carried_from); the original is marked
  * moved, so history and Stats still see the day as it was. Unfinished daily goals from the last day with goals
- * carry over too.
+ * carry over too. Meetings imported from Calendar stay on their own day.
  */
 object DayPlanner {
     const val TOMORROW = 0
     const val SPLIT = 1
     const val DROP = 2
+    /** The category of chunks imported from Calendar (api/google-import.js). */
+    const val MEETING = "meet"
 
     data class Result(val changed: List<Chunk>, val goals: List<Goal>)
 
@@ -26,7 +28,8 @@ object DayPlanner {
     ): Result {
         val changed = mutableListOf<Chunk>()
         val choices = unfinished.map { it.date }.distinct().associateWith(slips)
-        for (c in unfinished.filter { it.date < today && it.status == Chunk.PLANNED }) {
+        // Meetings (from Calendar) happened or not on their day; they never move to the next.
+        for (c in unfinished.filter { it.date < today && it.status == Chunk.PLANNED && it.category != MEETING }) {
             when (choices[c.date]?.get(c.id) ?: TOMORROW) {
                 DROP -> changed += c.copy(status = Chunk.DROPPED, updatedAt = now)
                 SPLIT -> {

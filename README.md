@@ -108,6 +108,30 @@ The day is also kept in the cloud, as a backup and for other devices later: the 
 - **Looking at the data:** Cloudflare dashboard → Storage & Databases → D1 → `kohulabs-android` → Console, or
   `npx wrangler d1 execute kohulabs-android --remote --command "SELECT …"`.
 
+### Your real day from Google (`api/google-import.js`)
+
+The Worker brings in each day from Google Calendar and Gmail, every hour from 05:00 to 21:00 UTC (`triggers` in
+`wrangler.jsonc`) and right after a sync when the last import is over 50 minutes old, so a new sign-in shows the real
+day within seconds. "Today" is counted in `TIMEZONE` (Europe/Lisbon).
+
+- **Calendar** (`calendar.readonly`): today's events in the primary calendar, except all-day, declined and
+  out-of-office ones, become a "Meeting" chunk at their real time in the Kohu workspace, plus a meeting with its
+  attendees and Meet link. Moved or cancelled events update; what you did on the phone (done, skipped) is kept.
+  Meetings never roll over to the next day.
+- **Gmail** (`gmail.metadata`: sender and subject only, never bodies): unread threads in the inbox's Primary category
+  become "waiting on you" follow-ups; once read, they are done.
+- **A nudge each morning:** "Today: 4 meetings, 6 emails waiting", in the app's language.
+- **The sample day** is cleared on the phone the first time a real day arrives (`FoundersStore`).
+
+Sign-in asks Google for both scopes with offline access; the refresh token is kept in D1 (`google_accounts`, server
+only, migration 0003), encrypted with a key derived from `SESSION_SECRET`. If Google access is removed, the import stops
+and waits for a new sign-in. Setting it up, once:
+
+1. Google Cloud console → APIs & Services → Library: enable the **Google Calendar API** and the **Gmail API**.
+2. Google Auth Platform → Data Access → Add or remove scopes: add `.../auth/calendar.readonly` and
+   `.../auth/gmail.metadata`. With the app set to Internal (your Workspace only), no Google verification is needed.
+3. In the app: You › Sign out, then sign in again, and allow Calendar and Gmail.
+
 ## Tests
 
 CI (`.github/workflows/ci.yml`) runs on every pull request and every push to main:
@@ -121,5 +145,5 @@ CI (`.github/workflows/ci.yml`) runs on every pull request and every push to mai
 
 ## Still simulated
 
-As in the design: OpenRouter sign-in, Kō's replies, the wake word, the MCP servers, the Spend figures, meeting prep
-and the Stats week.
+As in the design: OpenRouter sign-in, Kō's replies, the wake word, the MCP servers, the Spend figures, the meeting
+screen (prep and follow-up), and the Stats week.

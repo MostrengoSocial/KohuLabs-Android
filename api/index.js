@@ -7,12 +7,19 @@
 //                                   90 days. PKCE: only the app that started the sign-in knows the verifier.
 //   POST /api/sync                  the app's data ↔ D1 (binding DB; see sync.js)
 //   GET  /api/status                {configured, sync}: whether sign-in and the database are set up
+//   (schedule)                      imports everyone's Calendar and Gmail for today (google-import.js); a sync also
+//                                   starts one in the background when the last is over 50 minutes old
+//
+// Sign-in also asks Google for read-only Calendar and Gmail-metadata access with offline use; the refresh token is kept
+// encrypted in D1 (google_accounts) for the import. People can untick either on Google's consent screen.
 //
 // Settings (Cloudflare dashboard → the Worker → Settings → Variables and Secrets):
 //   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET   (type: Secret)
 //   FOUNDER_EMAILS   comma-separated Google accounts allowed in, set in wrangler.jsonc
-import { b64url, cookie, emailList, enc, googleClaims, googleConfig, json, randomToken, readCookie, redirect, sign, verify } from './google.js';
-import { sync } from './sync.js';
+//   TIMEZONE         the time zone "today" is counted in (default Europe/Lisbon), set in wrangler.jsonc
+import { b64url, cookie, emailList, enc, googleConfig, googleSignIn, json, randomToken, readCookie, redirect, seal, sign, verify } from './google.js';
+import { IMPORT_SCOPES, importAll, importIfDue } from './google-import.js';
+import { migrate, sync } from './sync.js';
 
 const OAUTH_SECONDS = 10 * 60;
 const CODE_SECONDS = 2 * 60;
@@ -37,8 +44,10 @@ async function startGoogle(env, url) {
   const challenge = b64url(await crypto.subtle.digest('SHA-256', enc.encode(verifier)));
   const flow = await sign({ kind: 'flow', state, verifier, nonce, app, exp: Math.floor(Date.now() / 1000) + OAUTH_SECONDS }, c.secret);
   const q = new URLSearchParams({
-    client_id: c.googleId, redirect_uri: `${url.origin}/auth/google/callback`, response_type: 'code', scope: 'openid email profile',
-    state, nonce, code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account',
+    client_id: c.googleId, redirect_uri: `${url.origin}/auth/google/callback`, response_type: 'code', scope: ['openid', 'email', 'profile', ...IMPORT_SCOPES].join(' '),
+    state, nonce, code_challenge: challenge, code_challenge_method: 'S256',
+    // offline + consent: Google returns a refresh token every time, so the import keeps working after the app closes
+    access_type: 'offline', include_granted_scopes: 'true', prompt: 'consent select_account',
   });
   return redirect(`${c.authUrl}?${q}`, [['Set-Cookie', cookie(flowCookie(url), flow, { secure: url.protocol === 'https:', maxAge: OAUTH_SECONDS })]]);
 }
@@ -50,10 +59,18 @@ async function finishGoogle(request, env, url) {
   const flow = await verify(readCookie(request, flowCookie(url)), c.secret);
   const code = url.searchParams.get('code'), state = url.searchParams.get('state');
   if (!flow || flow.kind !== 'flow' || !code || !state || state !== flow.state) return toApp('error=failed', url);
-  const claims = await googleClaims(c, { code, verifier: flow.verifier, nonce: flow.nonce, redirectUri: `${url.origin}/auth/google/callback` });
-  if (!claims) return toApp('error=failed', url);
+  const signedIn = await googleSignIn(c, { code, verifier: flow.verifier, nonce: flow.nonce, redirectUri: `${url.origin}/auth/google/callback` });
+  if (!signedIn) return toApp('error=failed', url);
+  const { claims, tokens } = signedIn;
   const email = String(claims.email).toLowerCase();
   if (!allowed(email, env)) return toApp('error=not_invited', url);
+  // Keep Google access for the import, encrypted; the next sync imports straight away (last_import_at cleared).
+  if (env.DB && tokens.refresh_token) {
+    await migrate(env.DB);
+    await env.DB.prepare(`INSERT INTO google_accounts (user_id, refresh_token, scopes, updated_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT (user_id) DO UPDATE SET refresh_token = excluded.refresh_token, scopes = excluded.scopes, updated_at = excluded.updated_at, last_import_at = NULL, last_error = NULL`)
+      .bind(email, await seal(tokens.refresh_token, c.secret), String(tokens.scope || ''), Date.now()).run();
+  }
   // A short-lived code the app can only redeem with its PKCE verifier (POST /api/token).
   const appCode = await sign({ kind: 'code', email, name: claims.name || email, challenge: flow.app, exp: Math.floor(Date.now() / 1000) + CODE_SECONDS }, c.secret);
   return toApp(`code=${encodeURIComponent(appCode)}`, url);
@@ -86,7 +103,7 @@ async function appUser(request, env) {
   return allowed(t.email, env) ? { email: t.email } : null;     // re-checked every time: removing someone locks them out
 }
 
-async function syncRoute(request, env) {
+async function syncRoute(request, env, ctx) {
   const user = await appUser(request, env);
   if (!user) return json({ error: 'unauthorized' }, 401);
   if (!env.DB) return json({ error: 'sync_not_configured' }, 503);
@@ -94,12 +111,14 @@ async function syncRoute(request, env) {
   if (tooBig) return json({ error: 'too_large' }, 413);
   const res = await sync(env.DB, user.email, body);
   if (res.status !== 200) return json({ error: res.error }, res.status);
+  // Bring in Calendar and Gmail after replying, when due; the phone gets the result on its next sync.
+  if (ctx) ctx.waitUntil(importIfDue(env, user.email).catch(() => {}));
   return json({ cursor: res.cursor, more: res.more, changes: res.changes });
 }
 
 // ---- routing -----------------------------------------------------------------------------------------------------
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const route = `${request.method} ${url.pathname}`;
     try {
@@ -107,10 +126,15 @@ export default {
       if (route === 'GET /auth/google') return await startGoogle(env, url);
       if (route === 'GET /auth/google/callback') return await finishGoogle(request, env, url);
       if (route === 'POST /api/token') return await token(request, env);
-      if (route === 'POST /api/sync') return await syncRoute(request, env);
+      if (route === 'POST /api/sync') return await syncRoute(request, env, ctx);
     } catch (err) {
       return json({ error: 'server_error' }, 500);
     }
     return json({ error: 'not_found' }, 404);
+  },
+
+  // wrangler.jsonc "triggers": every hour through the day
+  async scheduled(event, env, ctx) {
+    if (configured(env) && env.DB) ctx.waitUntil(importAll(env));
   },
 };
