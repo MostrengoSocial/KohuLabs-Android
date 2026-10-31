@@ -1,4 +1,4 @@
-// Cloudflare Worker for kohulabs-android, the Kohu Founders app (api/): Google sign-in and the cloud copy of the founder's day.
+// Cloudflare Worker for kohulabs-android, the Kō app (api/): Google sign-in and the cloud copy of the founder's day.
 // Deployed with `npx wrangler deploy` (pushes to main, through Cloudflare Workers Builds: a Worker named kohulabs-android
 // connected to this repository, with the default commands) or `npx wrangler versions upload` for other branches.
 //

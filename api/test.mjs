@@ -277,3 +277,14 @@ test('import: only what was granted, a revoked token stops it, and the schedule 
   await worker.scheduled({}, env, { waitUntil: (p) => waits.push(p) });
   assert.equal((await Promise.all(waits))[0].length, 1);
 });
+
+test('refresh: imports now for the signed-in person, at most once a minute; needs a sign-in and Google', async () => {
+  const state = { scope: `${CAL_SCOPE} ${MAIL_SCOPE}`, events: [], mail: [{ id: 'm1', thread: 't1', from: 'Ana <a@x.pt>', subject: 'Hi' }] };
+  const { env, token } = await connected(state);
+  assert.equal((await post('/api/refresh', {}, { env })).status, 401);
+  const first = await (await post('/api/refresh', {}, { token, env })).json();
+  assert.equal(first.ok, true); assert.equal(first.emails, 1);
+  assert.deepEqual(await (await post('/api/refresh', {}, { token, env })).json(), { ok: true, skipped: true });
+  env.DB.db.prepare('DELETE FROM google_accounts').run();
+  assert.deepEqual(await (await post('/api/refresh', {}, { token, env })).json(), { ok: false, error: 'no_google' });
+});

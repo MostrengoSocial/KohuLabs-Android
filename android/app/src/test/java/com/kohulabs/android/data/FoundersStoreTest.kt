@@ -96,6 +96,17 @@ class FoundersStoreTest {
         assertEquals(1, store.today("2026-10-29", "en").getJSONArray("goals").length())
     }
 
+    @Test fun theWeekCountsChunksDoneAndTheirMinutes() {
+        store.today("2026-10-29", "en")                     // a Thursday: c1 (15) and c2 (25) are done in the sample
+        ops(op("chunk", "id" to "c3", "status" to "done"))  // 25 more
+        val days = store.week("2026-10-29").getJSONArray("days").objects()
+        assertEquals("2026-10-26", days.first().getString("date"))
+        assertEquals(7, days.size)
+        val thursday = days.first { it.getString("date") == "2026-10-29" }
+        assertEquals(5 to 100, thursday.getInt("done") to thursday.getInt("minutes")) // c1 15, c2 25, c3 25, p1 20, r1 15
+        assertEquals(0, days.first().getInt("done"))
+    }
+
     @Test fun theNextDayCarriesUnfinishedWorkAsTheReviewSaid() {
         store.today("2026-10-29", "en")
         ops(op("review", "date" to "2026-10-29", "feel" to 2, "slips" to JSONObject().put("c8", DayPlanner.DROP).put("c7", DayPlanner.SPLIT)))

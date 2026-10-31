@@ -61,6 +61,19 @@ class Cloud private constructor(context: Context) {
         soon = worker.schedule({ syncNow() }, 8, TimeUnit.SECONDS)
     }
 
+    /**
+     * Pull to refresh: the cloud imports Calendar and Gmail now (POST /api/refresh), then a sync brings it down.
+     * [done] gets {ok, pulled, meetings?, emails?, error?} on the sync thread.
+     */
+    fun refresh(done: (JSONObject) -> Unit) {
+        if (account.token() == null) return done(JSONObject().put("ok", false).put("error", "signed_out").put("pulled", 0))
+        worker.execute {
+            val out = try { api.post("/api/refresh", JSONObject()) } catch (e: Exception) { JSONObject().put("ok", false).put("error", (e as? Api.HttpError)?.message ?: "offline") }
+            val pulled = try { sync.run().pulled } catch (e: Exception) { out.put("ok", false).put("error", out.optString("error").ifEmpty { "offline" }); 0 }
+            done(out.put("pulled", pulled))
+        }
+    }
+
     /** Syncs once, [seconds] from now (after sign-in: by then the cloud has imported Calendar and Gmail). */
     fun syncAfter(seconds: Long, done: (Sync.Result?) -> Unit) {
         worker.schedule({ syncNow(done) }, seconds, TimeUnit.SECONDS)

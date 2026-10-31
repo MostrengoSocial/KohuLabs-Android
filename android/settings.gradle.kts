@@ -1,4 +1,4 @@
-// kohulabs-android: the Kohu Founders app. Build from this folder: ./gradlew assembleDebug (see README.md).
+// kohulabs-android: the Kō app. Build from this folder: ./gradlew assembleDebug (see README.md).
 pluginManagement {
     repositories {
         google()

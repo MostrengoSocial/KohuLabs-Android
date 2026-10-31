@@ -1,4 +1,4 @@
-// Kohu Founders (/founders/): the founder's day planner with Kō, from the Claude Design file "Ko Phone".
+// Kō (/founders/): the founder's day planner with Kō, from the Claude Design file "Ko Phone".
 import { test, expect } from './helpers.mjs';
 
 const nav = (page, i) => page.locator('nav button').nth(i);
@@ -126,13 +126,131 @@ test('in the Android app: the day comes from the phone database and changes are 
   expect(ops.find((o) => o.op === 'chunk')).toMatchObject({ id: 'k2', status: 'done' });
   expect(ops.find((o) => o.op === 'nudge')).toMatchObject({ answer: 'Thursday' });
 
-  // Kō remembers the chat; a task you give him is added to the store, which names it.
+  // Kō keeps today's chat (without the design's scripted answers); a task you give him is added to the store.
   await page.getByRole('button', { name: 'General' }).first().click();
   await page.locator('nav button').nth(2).click();
-  await expect(page.getByText('Metrics section, 25 minutes.')).toBeVisible();
-  await page.getByPlaceholder('Ask Kō or give him a task').fill('renew my passport');
+  await expect(page.getByText('What’s next?', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Metrics section, 25 minutes.')).toHaveCount(0);
+  await page.getByPlaceholder('Ask Kō or give him a task').fill('add: renew my passport');
   await page.keyboard.press('Enter');
   await expect.poll(() => page.evaluate(() => window.ops.filter((o) => o.op === 'add').length)).toBe(1);
   expect((await page.evaluate(() => window.ops)).find((o) => o.op === 'add')).toMatchObject({ clientId: 'f0', ws: 'personal', title: 'Renew my passport', minutes: 25 });
   expect((await page.evaluate(() => window.ops)).filter((o) => o.op === 'setting').map((o) => o.key)).toContain('mode');
+});
+
+
+// Phase 0: in the app, nothing the design invented is shown; what is not built yet is hidden, the rest is real.
+test('in the Android app: only true things are shown, and Kō only says what it knows', async ({ page }) => {
+  await page.addInitScript(() => {
+    const day = new Date(), pad = (n) => String(n).padStart(2, '0'), today = `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+    const stored = {
+      chunks: [
+        { id: 'cal:a', ws: 'kohu', start: '09:30', minutes: 30, title: 'Board call', category: 'meet', status: 'done', startedAt: null },
+        { id: 'k2', ws: 'kohu', start: '11:00', minutes: 25, title: 'Pricing copy', category: 'fed', status: 'planned', startedAt: null },
+        { id: 'cal:b', ws: 'kohu', start: '15:00', minutes: 60, title: 'Investor sync', category: 'meet', status: 'planned', startedAt: null }
+      ],
+      goals: [], nudges: [], alarms: [], messages: [], review: null, settings: { mode: '"kohu"' }, workspaces: [],
+      followUps: [{ id: 'gm:18abc', ws: 'kohu', person: 'Ana Reis', what: 'Deck follow-up', direction: 'you', days: 1, source: 'Gmail', nudged: false }]
+    };
+    window.alarms = []; window.opened = [];
+    window.KohuAndroid = {
+      platform: () => 'android', today: (date) => JSON.stringify({ date, ...stored }), apply: () => JSON.stringify({ ids: {} }),
+      setAlarm: (h, m, label) => { window.alarms.push([h, m, label]); return true; },
+      week: () => JSON.stringify({ days: Array.from({ length: 7 }, (_, i) => ({ date: i === 2 ? today : `x${i}`, done: i === 2 ? 3 : i === 0 ? 1 : 0, minutes: i === 2 ? 90 : i === 0 ? 25 : 0 })) })
+    };
+  });
+  const nav = (i) => page.locator('nav button').nth(i);
+  await page.goto('/founders/?screen=home&homeVariant=timeline');
+
+  // Today: real chunks and meetings; no focus guard, no fake "synced from" line, no pretend mic.
+  await expect(page.getByText('Pricing copy').first()).toBeVisible();
+  await expect(page.getByText('Meeting · 60 min · Calendar')).toBeVisible();
+  await expect(page.getByText(/Focus guard/)).toHaveCount(0);
+  await expect(page.getByText(/Synced from/)).toHaveCount(0);
+
+  // Kō: a greeting from the real day, honest answers, a real alarm at the time asked.
+  await nav(2).click();
+  await expect(page.getByText('Hi. 2 of 3 chunks left today, 1 of them meetings.')).toBeVisible();
+  await expect(page.getByText('Kō · no AI yet')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mic' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'What’s next?' }).click();
+  await expect(page.getByText('Now: Pricing copy, 25 min. Then Investor sync at 15:00.')).toBeVisible();
+  const input = page.getByPlaceholder('Ask Kō or give him a task');
+  await input.fill('wake me at 6:30'); await page.keyboard.press('Enter');
+  await expect(page.getByText('Done: an alarm at 06:30 in your Clock app.')).toBeVisible();
+  expect(await page.evaluate(() => window.alarms)).toEqual([[6, 30, 'Kō alarm']]);
+  await input.fill('write the board memo'); await page.keyboard.press('Enter');
+  await expect(page.getByText(/^I can’t answer that yet/)).toBeVisible();
+
+  // Stats: this week from the database; no Spend tab.
+  await nav(1).click();
+  await expect(page.getByText('4 chunks done.')).toBeVisible();
+  await expect(page.getByText('1.9 hours of focus.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Spend' })).toHaveCount(0);
+  await expect(page.getByText('38 chunks.')).toHaveCount(0);
+
+  // Follow-ups: real Gmail threads open in Gmail.
+  await nav(3).click();
+  await page.getByRole('button', { name: 'Follow-ups' }).click();
+  await expect(page.getByText('Deck follow-up')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Draft reply' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open in Gmail' })).toBeVisible();
+
+  // Settings: only what exists.
+  await nav(4).click();
+  await expect(page.getByText('Senders and subjects')).toBeVisible();
+  for (const gone of ['Tools (MCP)', 'Wake phrases', 'Try a wake-up', 'OpenRouter key', 'Monthly cap']) await expect(page.getByText(gone, { exact: true })).toHaveCount(0);
+});
+
+// Kō's home message, pull to refresh, and voice (the app's KohuBridge stood in for).
+test('in the Android app: Kō’s home says what is planned and waiting; pull to refresh; voice into the task box', async ({ page }) => {
+  await page.addInitScript(() => {
+    const stored = {
+      chunks: [{ id: 'cal:a', ws: 'kohu', start: '15:00', minutes: 60, title: 'Investor sync', category: 'meet', status: 'planned', startedAt: null },
+        { id: 'k2', ws: 'kohu', start: '11:00', minutes: 25, title: 'Pricing copy', category: 'fed', status: 'planned', startedAt: null }],
+      goals: [], nudges: [], alarms: [], messages: [], review: null, settings: { mode: '"general"' }, workspaces: [],
+      followUps: [{ id: 'gm:1', ws: 'kohu', person: 'Ana', what: 'Deck', direction: 'you', days: 0, source: 'Gmail', nudged: false },
+        { id: 'gm:2', ws: 'kohu', person: 'Rui', what: 'IVA', direction: 'you', days: 1, source: 'Gmail', nudged: false }]
+    };
+    window.calls = [];
+    window.KohuAndroid = {
+      platform: () => 'android', today: (date) => JSON.stringify({ date, ...stored }), apply: () => JSON.stringify({ ids: {} }), setAlarm: () => true,
+      refresh: () => { window.calls.push('refresh'); }, canListen: () => true, listen: (lang) => { window.calls.push('listen:' + lang); }
+    };
+  });
+  await page.goto('/founders/?screen=home');
+  const note = page.locator('.kf-note');
+  await expect(note).toHaveText('Today: 2 chunks left, next meeting 15:00 Investor sync. 2 emails waiting on you.');
+
+  // Pull down from the top: the pill follows, a release past the line asks the phone to refresh, Kō thinks.
+  const box = await page.locator('#app').boundingBox();
+  const swipe = (dy) => page.evaluate(async ({ x, y, dy }) => {
+    const el = document.querySelector('.kf-scroll');
+    const t = (yy) => [new Touch({ identifier: 1, target: el, clientX: x, clientY: yy })];
+    el.dispatchEvent(new TouchEvent('touchstart', { touches: t(y), bubbles: true }));
+    for (let i = 1; i <= 5; i++) el.dispatchEvent(new TouchEvent('touchmove', { touches: t(y + dy * i / 5), bubbles: true }));
+    el.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true }));
+  }, { x: box.x + box.width / 2, y: box.y + 120, dy });
+  await swipe(40);
+  expect(await page.evaluate(() => window.calls)).toEqual([]);      // not far enough
+  await swipe(140);
+  expect(await page.evaluate(() => window.calls)).toEqual(['refresh']);
+  await expect(page.locator('.kf-pull')).toHaveText('Checking Calendar and Gmail');
+  await expect(page.getByText('Checking Calendar and Gmail').nth(1)).toBeVisible();   // Kō's own line
+  // Nothing new came in: "Up to date", then the pill goes.
+  await page.evaluate(() => window.kohuFounders.refreshed({ ok: true, pulled: 0 }));
+  await expect(page.locator('.kf-pull')).toHaveText('Up to date');
+  await expect(page.locator('.kf-pull')).toHaveCount(0, { timeout: 5000 });
+  // No connection: Kō says so in its message.
+  await page.evaluate(() => { window.kohuFounders.refreshNow(); window.kohuFounders.refreshed({ ok: false, error: 'offline', pulled: 0 }); });
+  await expect(page.locator('.kf-pull')).toHaveText('No connection');
+  await expect(note).toContainText('I couldn’t reach Google just now.');
+
+  // Voice: the mic asks the phone to listen, and what was heard lands in the task box.
+  await note.click();
+  await page.getByRole('button', { name: 'Personal' }).first().click();
+  await page.getByRole('button', { name: 'Mic' }).click();
+  expect(await page.evaluate(() => window.calls)).toContain('listen:en');
+  await page.evaluate(() => window.kohuFounders.heard('call the bank tomorrow morning'));
+  await expect(page.getByPlaceholder('A task, in your own words')).toHaveValue('call the bank tomorrow morning');
 });

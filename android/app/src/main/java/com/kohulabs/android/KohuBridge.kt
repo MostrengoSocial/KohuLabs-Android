@@ -26,6 +26,10 @@ class KohuBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun today(date: String, lang: String): String = store.today(date, lang).toString()
 
+    /** This week's chunks done and focus minutes per day, as JSON (see FoundersStore.week). */
+    @JavascriptInterface
+    fun week(date: String): String = store.week(date).toString()
+
     /** Saves a JSON list of changes (see FoundersStore.apply); returns the ids the store gave new rows. */
     @JavascriptInterface
     fun apply(ops: String): String = store.apply(JSONArray(ops)).toString().also { cloud.syncSoon() }
@@ -40,6 +44,18 @@ class KohuBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun signOut() = cloud.signOut()
+
+    /** Pull to refresh: Calendar and Gmail now, then a sync; the page hears back in kohuFounders.refreshed(result). */
+    @JavascriptInterface
+    fun refresh() = cloud.refresh { res -> activity.toPage("refreshed", res.toString()) }
+
+    /** Whether the phone can turn speech into text (Google's speech recognition, or another app that offers it). */
+    @JavascriptInterface
+    fun canListen(): Boolean = activity.canListen()
+
+    /** Listens once in [lang] (en | pt); the page hears back in kohuFounders.heard(text), "" when nothing was said. */
+    @JavascriptInterface
+    fun listen(lang: String) = activity.listen(lang)
 
     /** Sets an alarm in the phone's clock app, without opening it. False when there is no clock app. */
     @JavascriptInterface

@@ -1,6 +1,6 @@
 # kohulabs-android
 
-**Kohu Founders**, the Android app for the Kohu Labs founder, João Duarte: **Kō runs the day, you do the chunks.** Built from the
+**Kō**, the Android app for the Kohu Labs founder, João Duarte. **Kō runs the day, you do the chunks.** Built from the
 Claude Design project "Kohu Founders App" (file "Ko Phone"). Kō plans the day in 25 minute chunks across four tabs
 (General, Kohu with MCP tools, Personal and Revolut fed by you). Home is Kō roaming the screen until you tap him; then
 Focus, Today, Day map, the focus guard, the day review, meeting prep and follow-up, follow-ups, Kō's chat and voice,
@@ -44,6 +44,17 @@ Or open `android/` in Android Studio. CI builds the same debug APK on every pull
 `kohulabs-android-apk`), which installs on a phone with "Install unknown apps" allowed. For a Play Store build,
 `./gradlew assembleRelease` (or `bundleRelease`) signs with the keystore named by `KOHU_KEYSTORE`,
 `KOHU_KEYSTORE_PASSWORD`, `KOHU_KEY_ALIAS` and `KOHU_KEY_PASSWORD`.
+
+### Day to day
+
+- **Kō's home** shows a short message under Kō: what's left today, the next meeting, the emails waiting on you, and
+  whether Google could be reached. Tap it for Today.
+- **Pull down to refresh** (anywhere but Kō's chat): the cloud imports Calendar and Gmail on the spot
+  (`POST /api/refresh`, at most once a minute), then the app syncs; Kō thinks while it checks.
+- **Voice:** the mic buttons (task box, Kō's chat) use the phone's own speech-to-text, so you can tell Kō a task out
+  loud. It's the way in for work that can't be connected (Revolut).
+- **Only true things:** where a feature isn't built yet (Kō's AI, the focus guard, MCP tools, Spend, the wake word),
+  the app hides it instead of showing the design's sample.
 
 ## The screens (`web/founders/`)
 

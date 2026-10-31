@@ -28,6 +28,18 @@ class FoundersStore(
         snapshot(date)
     }
 
+    /** Monday to Sunday of [date]'s week: per day, the chunks done and their minutes (for Stats). */
+    fun week(date: String): JSONObject {
+        val monday = LocalDate.parse(date).with(java.time.DayOfWeek.MONDAY)
+        val days = JSONArray()
+        for (i in 0L until 7L) {
+            val d = monday.plusDays(i).toString()
+            val done = dao.chunksOn(d).filter { it.status == Chunk.DONE }
+            days.put(JSONObject().put("date", d).put("done", done.size).put("minutes", done.sumOf { it.minutes }))
+        }
+        return JSONObject().put("days", days)
+    }
+
     /**
      * Saves changes. Each is an object with an "op":
      *   chunk {id, status}         done | skipped | planned

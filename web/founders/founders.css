@@ -1,4 +1,4 @@
-/* Kohu Founders. Tokens and k- component classes come from the Kohu UI design system
+/* Kō. Tokens and k- component classes come from the Kohu UI design system
    (design-system/kohu-ui/src/kohu-ui.css, itself from css/styles.css); the kf- rules lay out the phone frame. */
 @font-face { font-family: "Bricolage Grotesque"; src: url("../assets/fonts/bricolage-grotesque-latin-wght-normal.woff2") format("woff2"); font-weight: 200 800; font-style: normal; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 @font-face { /* extended Latin (e.g. the ō in Kō) */ font-family: "Bricolage Grotesque"; src: url("../assets/fonts/bricolage-grotesque-latin-ext-wght-normal.woff2") format("woff2"); font-weight: 200 800; font-style: normal; font-display: swap; unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
@@ -232,3 +232,16 @@ html.kf-native .kf-screen { --kf-top: 0px; --kf-bottom: 0px; border-radius: 0; p
 html.kf-native .kf-status, html.kf-native .kf-homebar { display: none !important; }
 html.kf-native .kf-screen * { -webkit-user-select: none; user-select: none; }
 html.kf-native .kf-screen input { -webkit-user-select: text; user-select: text; }
+
+/* Pull to refresh (founders.js): a pill under the status bar with Kō's eyes, which blink while it checks. */
+.kf-pull { position: absolute; left: 50%; top: calc(var(--kf-top) + 10px); z-index: 40; display: flex; align-items: center; gap: 9px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-pill); box-shadow: var(--shadow-float); color: var(--ink); font: 400 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; transition: transform 0.15s ease-out; }
+.kf-pull-eyes { display: flex; gap: 4px; }
+.kf-pull-eyes i { width: 5px; height: 5px; border-radius: 50%; background: var(--acid); }
+.kf-pull-eyes.kf-thinking i { animation: kf-blink 0.9s ease-in-out infinite; }
+.kf-pull-eyes.kf-thinking i + i { animation-delay: 0.15s; }
+@keyframes kf-blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.15); } }
+@media (prefers-reduced-motion: reduce) { .kf-pull-eyes.kf-thinking i { animation: none; opacity: 0.6; } }
+
+/* Kō's message on the home screen: what is planned and what is waiting. Tap for Today. */
+.kf-note { position: absolute; left: 22px; right: 22px; bottom: 46px; z-index: 3; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sharp); color: var(--ink); font: 400 14px/1.45 var(--font-sans); text-align: left; text-wrap: pretty; cursor: pointer; }
+.kf-note:focus-visible, .kf-note:hover { border-color: var(--accent); outline: none; }
