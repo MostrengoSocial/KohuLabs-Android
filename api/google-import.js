@@ -4,7 +4,7 @@
 //   Calendar  today's events in the primary calendar (not all-day, not declined) become a task, a "meet" chunk at their
 //             real time in the Kohu workspace, and a meeting with its attendees and link. Moved events move; events
 //             gone from today are marked deleted. What the phone did to a chunk (done, skipped, its timer) is kept.
-//   Gmail     unread threads in the inbox's Primary category become "waiting on you" follow-ups, from the sender and
+//   Gmail     unread threads in the inbox (not Promotions, Social, Updates, Forums) become "waiting on you" follow-ups, from the sender and
 //             subject only (the gmail.metadata scope cannot read bodies). A thread that is no longer unread is done.
 //   Nudge     one "your day" nudge per day, in the person's language, updated until they answer it.
 //
@@ -19,7 +19,12 @@ const SCOPE_CAL = 'https://www.googleapis.com/auth/calendar.readonly';
 const SCOPE_GMAIL = 'https://www.googleapis.com/auth/gmail.metadata';
 export const IMPORT_SCOPES = [SCOPE_CAL, SCOPE_GMAIL];
 const EVERY_MS = 50 * 60 * 1000;                     // after a sync, import again only if the last one is this old
-const MAX_EVENTS = 50, MAX_THREADS = 20;
+const MAX_EVENTS = 50, MAX_THREADS = 20, MAX_MESSAGES = 40;
+// Gmail's other tabs: mail there is not waiting on anyone. Read from each message's labels, not as a filter on the list,
+// because an inbox without tabs may not mark its mail as Primary (CATEGORY_PERSONAL) at all.
+const NOT_PERSONAL = ['CATEGORY_PROMOTIONS', 'CATEGORY_SOCIAL', 'CATEGORY_UPDATES', 'CATEGORY_FORUMS'];
+// Calendar event types that are meetings (fromGmail: flights, reservations and the like that Gmail adds)
+const MEETING_TYPES = ['default', 'fromGmail'];
 
 // Local date and clock time in the person's time zone.
 function local(ms, tz) {
@@ -72,7 +77,7 @@ export async function importFor(env, userId, { now = Date.now() } = {}) {
         singleEvents: 'true', orderBy: 'startTime', maxResults: String(MAX_EVENTS) });
       const { items = [] } = await google(`${CAL}?${q}`, access.accessToken);
       for (const ev of items) {
-        if (ev.status === 'cancelled' || !ev.start || !ev.start.dateTime || (ev.eventType && ev.eventType !== 'default')) continue;
+        if (ev.status === 'cancelled' || !ev.start || !ev.start.dateTime || (ev.eventType && !MEETING_TYPES.includes(ev.eventType))) continue;
         if ((ev.attendees || []).some((a) => a.self && a.responseStatus === 'declined')) continue;
         const start = Date.parse(ev.start.dateTime), end = Date.parse(ev.end && ev.end.dateTime);
         const at = local(start, tz);
@@ -117,14 +122,15 @@ export async function importFor(env, userId, { now = Date.now() } = {}) {
   let emails = 0;
   if (scopes.includes(SCOPE_GMAIL)) {
     try {
-      const q = new URLSearchParams([['labelIds', 'INBOX'], ['labelIds', 'UNREAD'], ['labelIds', 'CATEGORY_PERSONAL'], ['maxResults', String(MAX_THREADS)]]);
+      const q = new URLSearchParams([['labelIds', 'INBOX'], ['labelIds', 'UNREAD'], ['maxResults', String(MAX_MESSAGES)]]);
       const { messages = [] } = await google(`${GMAIL}?${q}`, access.accessToken);
       const threads = new Map();
       for (const { id } of messages) {
         const m = await google(`${GMAIL}/${encodeURIComponent(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`, access.accessToken);
-        if (!m.threadId || threads.has(m.threadId)) continue;
+        if (!m.threadId || threads.has(m.threadId) || (m.labelIds || []).some((l) => NOT_PERSONAL.includes(l))) continue;
         const h = Object.fromEntries((m.payload && m.payload.headers || []).map((x) => [x.name.toLowerCase(), x.value]));
         threads.set(m.threadId, { id: `gm:${m.threadId}`, person: sender(h.from).slice(0, 120), what: String(h.subject || '(no subject)').slice(0, 300), since: local(Number(m.internalDate) || now, tz).date });
+        if (threads.size >= MAX_THREADS) break;
       }
       emails = threads.size;
       for (const t of threads.values()) {
