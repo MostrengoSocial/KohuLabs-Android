@@ -7,6 +7,7 @@
 //                                   90 days. PKCE: only the app that started the sign-in knows the verifier.
 //   POST /api/sync                  the app's data ↔ D1 (binding DB; see sync.js)
 //   GET  /api/status                {configured, sync}: whether sign-in and the database are set up
+//   POST /api/refresh               imports Calendar and Gmail now (pull to refresh in the app); at most once a minute
 //   (schedule)                      imports everyone's Calendar and Gmail for today (google-import.js); a sync also
 //                                   starts one in the background when the last is over 50 minutes old
 //
@@ -18,7 +19,7 @@
 //   FOUNDER_EMAILS   comma-separated Google accounts allowed in, set in wrangler.jsonc
 //   TIMEZONE         the time zone "today" is counted in (default Europe/Lisbon), set in wrangler.jsonc
 import { b64url, cookie, emailList, enc, googleConfig, googleSignIn, json, randomToken, readCookie, redirect, seal, sign, verify } from './google.js';
-import { IMPORT_SCOPES, importAll, importIfDue } from './google-import.js';
+import { IMPORT_SCOPES, importAll, importFor, importIfDue } from './google-import.js';
 import { migrate, sync } from './sync.js';
 
 const OAUTH_SECONDS = 10 * 60;
@@ -116,6 +117,18 @@ async function syncRoute(request, env, ctx) {
   return json({ cursor: res.cursor, more: res.more, changes: res.changes });
 }
 
+// Pull to refresh: import now and say what came in. The app then syncs to bring it down.
+async function refreshRoute(request, env) {
+  const user = await appUser(request, env);
+  if (!user) return json({ error: 'unauthorized' }, 401);
+  if (!env.DB) return json({ error: 'sync_not_configured' }, 503);
+  await migrate(env.DB);
+  const acct = (await env.DB.prepare('SELECT last_import_at FROM google_accounts WHERE user_id = ?').bind(user.email).all()).results[0];
+  if (!acct) return json({ ok: false, error: 'no_google' });
+  if (acct.last_import_at && Date.now() - acct.last_import_at < 60_000) return json({ ok: true, skipped: true });
+  return json(await importFor(env, user.email));
+}
+
 // ---- routing -----------------------------------------------------------------------------------------------------
 export default {
   async fetch(request, env, ctx) {
@@ -127,6 +140,7 @@ export default {
       if (route === 'GET /auth/google/callback') return await finishGoogle(request, env, url);
       if (route === 'POST /api/token') return await token(request, env);
       if (route === 'POST /api/sync') return await syncRoute(request, env, ctx);
+      if (route === 'POST /api/refresh') return await refreshRoute(request, env);
     } catch (err) {
       return json({ error: 'server_error' }, 500);
     }

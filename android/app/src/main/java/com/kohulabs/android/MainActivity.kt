@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -15,6 +16,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewAssetLoader
@@ -36,6 +38,27 @@ class MainActivity : ComponentActivity() {
     private lateinit var web: WebView
     private val cloud by lazy { Cloud.get(this) }
     private val background = Executors.newSingleThreadExecutor()
+
+    // Speech to text: the phone's own recogniser (a dialog from Google, or another app that offers it).
+    private val speech = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val text = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
+        toPage("heard", JSONObject.quote(text))
+    }
+    private fun speechIntent(lang: String) = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        .putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (lang == "pt") "pt-PT" else "en-GB")
+        .putExtra(RecognizerIntent.EXTRA_PROMPT, if (lang == "pt") "Diz ao Kō" else "Tell Kō")
+
+    fun canListen() = speechIntent("en").resolveActivity(packageManager) != null
+
+    fun listen(lang: String) = runOnUiThread {
+        runCatching { speech.launch(speechIntent(lang)) }.onFailure { toPage("heard", "\"\"") }
+    }
+
+    /** Calls window.kohuFounders.<method>(<json>) on the page, if it is loaded. */
+    fun toPage(method: String, json: String) = runOnUiThread {
+        web.evaluateJavascript("window.kohuFounders && window.kohuFounders.$method && window.kohuFounders.$method($json)", null)
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {

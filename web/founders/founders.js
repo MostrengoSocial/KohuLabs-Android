@@ -546,6 +546,8 @@
   const SETTINGS = ['lang','mode','chunk','cap','model','nudgesOn','lock','wake','guardOn','guardAuto','guardVip','vipOff','provider','localOn','host','localModel','srvOn','srvPerm','stripe','mcpOff','scopeOff','orConnected','feedTarget'];
   const PILL = { decision:'k-pill k-pill-build', risk:'k-pill k-pill-live', info:'k-pill' };
   const fill = (arr, items) => { arr.length = 0; arr.push(...items); };
+  const PULL_AT = 80; // px to drag before a release refreshes
+  const canListen = !!(phone && typeof phone.canListen === 'function' && phone.canListen());
   const ids = {}; // chunks named in this session (f0, f1 ...) → their id in the database
 
   let day = null;
@@ -598,6 +600,7 @@
     renderVals() {
       const v = super.renderVals();
       v.demo = !day;
+      v.showMic = !day;
       if (phone && typeof phone.signIn === 'function') {
         v.startOAuth = () => phone.signIn();
         const signOut = v.signOut;
@@ -631,8 +634,23 @@
       t.revKo = say(`You finished ${f.done} of ${f.list.length} chunks today.`, `Acabaste ${f.done} de ${f.list.length} blocos hoje.`);
       t.alKo = say('Ask Kō for an alarm (“wake me at 6:45”) and it goes into your phone’s Clock app. Change or delete it there.', 'Pede um alarme ao Kō (“acorda-me às 6:45”) e ele vai para a app Relógio do telemóvel. Muda-o ou apaga-o lá.');
       t.folKo = say('Unread mail from your inbox, refreshed every hour. Promotions, social and updates are left out.', 'Email por ler da tua caixa de entrada, atualizado de hora a hora. Promoções, social e atualizações ficam de fora.');
-      // Home: no focus guard yet.
+      // Home: no focus guard yet; Kō's message says what is planned and what is waiting (tap it for Today).
       out.homeTiles = v.homeTiles.filter(b => b.label !== v.t.hGuard);
+      out.homeNote = this.homeNote(f);
+      out.openNote = () => this.setState({ homeView:'timeline', homeOpen:false, tilesIn:false });
+      // Pull to refresh (touch handling in componentDidMount): Calendar and Gmail now, Kō thinks while it checks.
+      const S = this.state, pullD = S.pullD || 0;
+      out.pullShow = !!(S.refreshing || pullD > 0 || S.refreshMsg);
+      out.pullY = `${S.refreshing || S.refreshMsg ? 0 : Math.min(pullD, 120) / 2 - 20}px`;
+      out.pullBorder = pullD > PULL_AT || S.refreshing ? 'var(--accent)' : 'var(--line)';
+      out.pullClass = S.refreshing ? 'kf-thinking' : '';
+      out.pullText = S.refreshing ? say('Checking Calendar and Gmail', 'A ver o Calendário e o Gmail') : S.refreshMsg || (pullD > PULL_AT ? say('Release to refresh', 'Larga para atualizar') : say('Pull to refresh', 'Puxa para atualizar'));
+      if (S.refreshing) { out.homeState = 'thinking'; out.homeMood = 'neutral'; out.behLabel = say('Checking Calendar and Gmail', 'A ver o Calendário e o Gmail'); }
+      // Voice: the phone's speech-to-text, for telling Kō a task (the way in for anything from Revolut).
+      out.showMic = canListen;
+      out.feedMic = () => this.listenFor('feed');
+      out.toggleMic = () => this.listenFor('ko');
+      if (S.listening) Object.assign(out, S.listening === 'feed' ? { feedMicBorder: 'var(--accent)', feedMicBg: 'var(--accent)', feedMicColor: 'var(--accent-ink)' } : { micBorder: 'var(--accent)', micBg: 'var(--accent)', micColor: 'var(--accent-ink)' });
       // Kō: no AI yet, so a greeting from the real day and replies only for what it can really do (send()).
       out.modelName = say('Kō · no AI yet', 'Kō · ainda sem IA');
       out.koHint = say('Ask what’s next, add a task (“add: …”) or set an alarm.', 'Pergunta o que vem a seguir, junta uma tarefa (“junta: …”) ou marca um alarme.');
@@ -667,6 +685,51 @@
         out.weekNo = String(Math.ceil(((thu - Date.UTC(thu.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7));
       }
       return out;
+    }
+
+    // Kō's line on the home screen: the day so far and what is waiting on you, from the real data.
+    homeNote(f) {
+      const say = (en, pt) => this.say(en, pt), n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+      const parts = [];
+      if (!f.list.length) parts.push(say('Nothing planned for today yet. Tell me what you need to do.', 'Ainda nada planeado para hoje. Diz-me o que tens de fazer.'));
+      else if (!f.left) parts.push(say(`Day done: all ${f.list.length} chunks finished.`, `Dia feito: os ${f.list.length} blocos estão acabados.`));
+      else {
+        const meet = f.list.find(c => c.group === 'meet' && !c.isDone);
+        parts.push(say(`Today: ${n(f.left, 'chunk', 'chunks')} left`, `Hoje: ${n(f.left, 'bloco', 'blocos')} por fazer`) +
+          (meet ? say(`, next meeting ${meet.time} ${meet.title}`, `, próxima reunião ${meet.time} ${meet.title}`) : '') + '.');
+      }
+      const mail = FOL_YOU.filter(x => this.inMode(x.ws) && !this.state.folDone.includes(x.id) && x.id.startsWith('gm:')).length;
+      if (mail) parts.push(say(`${n(mail, 'email', 'emails')} waiting on you.`, `${n(mail, 'email', 'emails')} à tua espera.`));
+      const r = this.lastRefresh;
+      if (r && r.ok === false && r.error !== 'no_google') parts.push(say('I couldn’t reach Google just now.', 'Não consegui chegar ao Google agora.'));
+      return parts.join(' ');
+    }
+    // Pull to refresh: ask the phone (KohuBridge.refresh); it answers in refreshed().
+    refreshNow() {
+      if (this.state.refreshing || typeof phone.refresh !== 'function') return;
+      this.setState({ refreshing: true, refreshMsg: null });
+      phone.refresh();
+    }
+    refreshed(res) {
+      this.lastRefresh = res;
+      if (res && res.pulled > 0) return location.reload();      // the store reads the new day (and clears the sample once)
+      const say = (en, pt) => this.say(en, pt);
+      const msg = !res || res.ok === false ? (res && res.error === 'no_google' ? say('Sign in again to connect Google', 'Entra outra vez para ligar o Google') : say('No connection', 'Sem ligação')) : say('Up to date', 'Tudo em dia');
+      this.setState({ refreshing: false, refreshMsg: msg });
+      this.later(() => this.setState({ refreshMsg: null }), 2200);
+    }
+    // Voice: one phrase from the phone's speech-to-text, into the task box or straight to Kō.
+    listenFor(target) {
+      if (this.state.listening || !canListen) return;
+      this.setState({ listening: target });
+      phone.listen(this.lang());
+    }
+    heard(text) {
+      const target = this.state.listening;
+      this.setState({ listening: null });
+      if (!text) return;
+      if (target === 'feed') this.setState({ feedInput: text });
+      else this.send(text);
     }
 
     // Called by the app when sign-in finished. In the app there is nothing else to set up yet (Kō's AI and the wake
@@ -763,7 +826,28 @@
     }
     componentDidMount() {
       super.componentDidMount();
-      if (day) this.persist(); // the current chunk's start, at once
+      if (!day) return;
+      this.persist(); // the current chunk's start, at once
+      // Pull to refresh: a drag down from the top of the screen (not in Kō's chat, which scrolls on its own).
+      const root = document.getElementById('app');
+      const atTop = () => { const sc = root.querySelector('.kf-scroll'); return !sc || sc.scrollTop <= 0; };
+      root.addEventListener('touchstart', (e) => {
+        this.pull = !this.state.refreshing && atTop() && !['ko', 'onboarding', 'wake', 'ring'].includes(this.scr()) ? { y: e.touches[0].clientY, d: 0 } : null;
+      }, { passive: true });
+      root.addEventListener('touchmove', (e) => {
+        if (!this.pull) return;
+        this.pull.d = Math.max(0, e.touches[0].clientY - this.pull.y);
+        this.setState({ pullD: this.pull.d });
+      }, { passive: true });
+      const end = () => {
+        if (!this.pull) return;
+        const go = this.pull.d > PULL_AT;
+        this.pull = null;
+        this.setState({ pullD: 0 });
+        if (go) this.refreshNow();
+      };
+      root.addEventListener('touchend', end);
+      root.addEventListener('touchcancel', end);
     }
     componentDidUpdate() {
       super.componentDidUpdate();

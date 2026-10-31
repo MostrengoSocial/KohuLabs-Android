@@ -45,6 +45,17 @@ Or open `android/` in Android Studio. CI builds the same debug APK on every pull
 `./gradlew assembleRelease` (or `bundleRelease`) signs with the keystore named by `KOHU_KEYSTORE`,
 `KOHU_KEYSTORE_PASSWORD`, `KOHU_KEY_ALIAS` and `KOHU_KEY_PASSWORD`.
 
+### Day to day
+
+- **Kō's home** shows a short message under Kō: what's left today, the next meeting, the emails waiting on you, and
+  whether Google could be reached. Tap it for Today.
+- **Pull down to refresh** (anywhere but Kō's chat): the cloud imports Calendar and Gmail on the spot
+  (`POST /api/refresh`, at most once a minute), then the app syncs; Kō thinks while it checks.
+- **Voice:** the mic buttons (task box, Kō's chat) use the phone's own speech-to-text, so you can tell Kō a task out
+  loud. It's the way in for work that can't be connected (Revolut).
+- **Only true things:** where a feature isn't built yet (Kō's AI, the focus guard, MCP tools, Spend, the wake word),
+  the app hides it instead of showing the design's sample.
+
 ## The screens (`web/founders/`)
 
 No dependencies. `index.html` holds the design's template (from the Claude Design export, inside

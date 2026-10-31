@@ -201,3 +201,56 @@ test('in the Android app: only true things are shown, and Kō only says what it 
   await expect(page.getByText('Senders and subjects')).toBeVisible();
   for (const gone of ['Tools (MCP)', 'Wake phrases', 'Try a wake-up', 'OpenRouter key', 'Monthly cap']) await expect(page.getByText(gone, { exact: true })).toHaveCount(0);
 });
+
+// Kō's home message, pull to refresh, and voice (the app's KohuBridge stood in for).
+test('in the Android app: Kō’s home says what is planned and waiting; pull to refresh; voice into the task box', async ({ page }) => {
+  await page.addInitScript(() => {
+    const stored = {
+      chunks: [{ id: 'cal:a', ws: 'kohu', start: '15:00', minutes: 60, title: 'Investor sync', category: 'meet', status: 'planned', startedAt: null },
+        { id: 'k2', ws: 'kohu', start: '11:00', minutes: 25, title: 'Pricing copy', category: 'fed', status: 'planned', startedAt: null }],
+      goals: [], nudges: [], alarms: [], messages: [], review: null, settings: { mode: '"general"' }, workspaces: [],
+      followUps: [{ id: 'gm:1', ws: 'kohu', person: 'Ana', what: 'Deck', direction: 'you', days: 0, source: 'Gmail', nudged: false },
+        { id: 'gm:2', ws: 'kohu', person: 'Rui', what: 'IVA', direction: 'you', days: 1, source: 'Gmail', nudged: false }]
+    };
+    window.calls = [];
+    window.KohuAndroid = {
+      platform: () => 'android', today: (date) => JSON.stringify({ date, ...stored }), apply: () => JSON.stringify({ ids: {} }), setAlarm: () => true,
+      refresh: () => { window.calls.push('refresh'); }, canListen: () => true, listen: (lang) => { window.calls.push('listen:' + lang); }
+    };
+  });
+  await page.goto('/founders/?screen=home');
+  const note = page.locator('.kf-note');
+  await expect(note).toHaveText('Today: 2 chunks left, next meeting 15:00 Investor sync. 2 emails waiting on you.');
+
+  // Pull down from the top: the pill follows, a release past the line asks the phone to refresh, Kō thinks.
+  const box = await page.locator('#app').boundingBox();
+  const swipe = (dy) => page.evaluate(async ({ x, y, dy }) => {
+    const el = document.querySelector('.kf-scroll');
+    const t = (yy) => [new Touch({ identifier: 1, target: el, clientX: x, clientY: yy })];
+    el.dispatchEvent(new TouchEvent('touchstart', { touches: t(y), bubbles: true }));
+    for (let i = 1; i <= 5; i++) el.dispatchEvent(new TouchEvent('touchmove', { touches: t(y + dy * i / 5), bubbles: true }));
+    el.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true }));
+  }, { x: box.x + box.width / 2, y: box.y + 120, dy });
+  await swipe(40);
+  expect(await page.evaluate(() => window.calls)).toEqual([]);      // not far enough
+  await swipe(140);
+  expect(await page.evaluate(() => window.calls)).toEqual(['refresh']);
+  await expect(page.locator('.kf-pull')).toHaveText('Checking Calendar and Gmail');
+  await expect(page.getByText('Checking Calendar and Gmail').nth(1)).toBeVisible();   // Kō's own line
+  // Nothing new came in: "Up to date", then the pill goes.
+  await page.evaluate(() => window.kohuFounders.refreshed({ ok: true, pulled: 0 }));
+  await expect(page.locator('.kf-pull')).toHaveText('Up to date');
+  await expect(page.locator('.kf-pull')).toHaveCount(0, { timeout: 5000 });
+  // No connection: Kō says so in its message.
+  await page.evaluate(() => { window.kohuFounders.refreshNow(); window.kohuFounders.refreshed({ ok: false, error: 'offline', pulled: 0 }); });
+  await expect(page.locator('.kf-pull')).toHaveText('No connection');
+  await expect(note).toContainText('I couldn’t reach Google just now.');
+
+  // Voice: the mic asks the phone to listen, and what was heard lands in the task box.
+  await note.click();
+  await page.getByRole('button', { name: 'Personal' }).first().click();
+  await page.getByRole('button', { name: 'Mic' }).click();
+  expect(await page.evaluate(() => window.calls)).toContain('listen:en');
+  await page.evaluate(() => window.kohuFounders.heard('call the bank tomorrow morning'));
+  await expect(page.getByPlaceholder('A task, in your own words')).toHaveValue('call the bank tomorrow morning');
+});

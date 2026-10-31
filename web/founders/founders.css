@@ -232,3 +232,16 @@ html.kf-native .kf-screen { --kf-top: 0px; --kf-bottom: 0px; border-radius: 0; p
 html.kf-native .kf-status, html.kf-native .kf-homebar { display: none !important; }
 html.kf-native .kf-screen * { -webkit-user-select: none; user-select: none; }
 html.kf-native .kf-screen input { -webkit-user-select: text; user-select: text; }
+
+/* Pull to refresh (founders.js): a pill under the status bar with Kō's eyes, which blink while it checks. */
+.kf-pull { position: absolute; left: 50%; top: calc(var(--kf-top) + 10px); z-index: 40; display: flex; align-items: center; gap: 9px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-pill); box-shadow: var(--shadow-float); color: var(--ink); font: 400 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; transition: transform 0.15s ease-out; }
+.kf-pull-eyes { display: flex; gap: 4px; }
+.kf-pull-eyes i { width: 5px; height: 5px; border-radius: 50%; background: var(--acid); }
+.kf-pull-eyes.kf-thinking i { animation: kf-blink 0.9s ease-in-out infinite; }
+.kf-pull-eyes.kf-thinking i + i { animation-delay: 0.15s; }
+@keyframes kf-blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.15); } }
+@media (prefers-reduced-motion: reduce) { .kf-pull-eyes.kf-thinking i { animation: none; opacity: 0.6; } }
+
+/* Kō's message on the home screen: what is planned and what is waiting. Tap for Today. */
+.kf-note { position: absolute; left: 22px; right: 22px; bottom: 46px; z-index: 3; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sharp); color: var(--ink); font: 400 14px/1.45 var(--font-sans); text-align: left; text-wrap: pretty; cursor: pointer; }
+.kf-note:focus-visible, .kf-note:hover { border-color: var(--accent); outline: none; }
