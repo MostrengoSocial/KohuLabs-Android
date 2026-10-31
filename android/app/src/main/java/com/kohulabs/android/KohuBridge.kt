@@ -49,6 +49,17 @@ class KohuBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun refresh() = cloud.refresh { res -> activity.toPage("refreshed", res.toString()) }
 
+    /** The Gmail accounts added to the import; the page hears back in kohuFounders.links({links}). */
+    @JavascriptInterface
+    fun loadLinks() = cloud.links { activity.toPage("links", it.toString()) }
+
+    /** Adds another Gmail (personal) in a browser tab; the page hears back in kohuFounders.linked({email} | {error}). */
+    @JavascriptInterface
+    fun linkGmail() = activity.startLink()
+
+    @JavascriptInterface
+    fun unlink(email: String) = cloud.unlink(email) { activity.toPage("links", it.toString()) }
+
     /** Whether the phone can turn speech into text (Google's speech recognition, or another app that offers it). */
     @JavascriptInterface
     fun canListen(): Boolean = activity.canListen()

@@ -3,7 +3,9 @@ package com.kohulabs.android.data
 import androidx.sqlite.db.SimpleSQLiteQuery
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
@@ -17,6 +19,7 @@ class FoundersStore(
     private val db: FoundersDatabase,
     private val clock: () -> Long = System::currentTimeMillis,
     private val newId: () -> String = ::randomId,
+    private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
     private val dao = db.dao()
 
@@ -25,6 +28,7 @@ class FoundersStore(
         seedIfEmpty(date, lang)
         clearSampleOnceRealDataArrives()
         rollOver(date)
+        plan(date)
         snapshot(date)
     }
 
@@ -45,7 +49,10 @@ class FoundersStore(
      *   chunk {id, status}         done | skipped | planned
      *   started {id, at}           the chunk became the current one (its timer starts)
      *   split {id}                 the chunk becomes two halves, id+"a" and id+"b"
-     *   add {clientId, ws, title, minutes, start, date}   a task you gave Kō, as one chunk
+     *   add {clientId, ws, title, minutes, start, date}   a task you gave Kō, as one chunk (before Kō planned)
+     *   task {clientId, ws, title, estimate?, due?}        a task you gave Kō, for Kō's plan (estimate in minutes)
+     *   plan {date, action}        accept: Kō's proposal becomes the day's plan
+     *                              again: plan the rest of the day afresh (a new proposal to accept)
      *   goal {id, done}            nudge {id, answer}       followUp {id, done?, nudged?}
      *   alarm {id, time?, label?, days?, on?, byKo?, brief?}   (adds it when new)
      *   message {date, ws?, who, text?, key?}   setting {key, value}   review {date, feel?, slips?}
@@ -75,6 +82,29 @@ class FoundersStore(
                 saveTasks(listOf(Task(taskId, ws, title, "fed", source = "you", dueDate = date, createdAt = now, updatedAt = now)))
                 saveChunks(listOf(Chunk(chunkId, taskId, ws, date, o.getString("start"), o.getInt("minutes"), title, "fed", updatedAt = now)))
                 ids.put(o.optString("clientId", chunkId), chunkId)
+            }
+            "task" -> {
+                val taskId = newId()
+                saveTasks(listOf(Task(taskId, o.getString("ws"), o.getString("title"), TASK, source = "you", dueDate = o.optStringOrNull("due"),
+                    createdAt = now, updatedAt = now, estimate = if (o.has("estimate") && !o.isNull("estimate")) o.getInt("estimate") else null)))
+                ids.put(o.optString("clientId", taskId), taskId)
+            }
+            "plan" -> {
+                val date = o.getString("date")
+                when (o.getString("action")) {
+                    "accept" -> {
+                        saveChunks(dao.proposedOn(date).map { it.copy(status = Chunk.PLANNED, updatedAt = now) })
+                        saveSetting(Setting(PLAN + date, JSONObject.quote(ACCEPTED), now))
+                    }
+                    "again" -> {
+                        // What is still ahead today goes back into the proposal; done, started and meetings stay.
+                        val after = if (date == localDate()) localMinutes() else 0
+                        saveChunks(dao.chunksOn(date).filter {
+                            it.status == Chunk.PLANNED && it.category != DayPlanner.MEETING && it.taskId != null && it.startedAt == null && DayPlanner.minutes(it.start) >= after
+                        }.map { it.copy(deleted = true, updatedAt = now) })
+                        saveSetting(Setting(PLAN + date, JSONObject.quote(PROPOSED), now))
+                    }
+                }
             }
             "goal" -> dao.goal(id)?.let { saveGoals(listOf(it.copy(done = o.getBoolean("done"), updatedAt = now))) }
             "nudge" -> dao.nudge(id)?.let { saveNudges(listOf(it.copy(answer = o.optString("answer", "dismissed"), answeredAt = now, updatedAt = now))) }
@@ -172,11 +202,65 @@ class FoundersStore(
         saveSetting(Setting(ROLLED_TO, JSONObject.quote(date), now))
     }
 
+    // ---- Kō's plan ----------------------------------------------------------------------------------------------------
+
+    private fun localDate() = Instant.ofEpochMilli(clock()).atZone(zone).toLocalDate().toString()
+    private fun localMinutes() = Instant.ofEpochMilli(clock()).atZone(zone).toLocalTime().let { it.hour * 60 + it.minute }
+    private fun json(key: String): JSONObject? = dao.setting(key)?.value?.let { runCatching { JSONObject(it) }.getOrNull() }
+    private fun planState(date: String): String? = dao.setting(PLAN + date)?.value?.let { runCatching { JSONArray("[$it]").getString(0) }.getOrNull() }
+
+    /**
+     * Working hours on [date], or null on a day off. "hours" holds the usual week (default: weekdays 09:00 to 18:00,
+     * lunch 13:00 for an hour); "hours:YYYY-MM-DD" changes one day ({start?, end?} or {off: true}), as you tell Kō.
+     */
+    fun hoursOn(date: String): DayPlanner.Hours? {
+        val base = json(HOURS) ?: JSONObject()
+        val day = json("$HOURS:$date")
+        if (day?.optBoolean("off") == true) return null
+        val days = base.optJSONArray("days")?.let { a -> (0 until a.length()).map { a.getInt(it) } } ?: listOf(1, 2, 3, 4, 5)
+        if (day == null && LocalDate.parse(date).dayOfWeek.value !in days) return null
+        fun at(key: String, fallback: String) = DayPlanner.minutes(day?.optString(key)?.takeIf { it.isNotEmpty() } ?: base.optString(key).ifEmpty { fallback })
+        val lunch = base.optString("lunch", "13:00").takeIf { it.isNotEmpty() }?.let(DayPlanner::minutes)
+        return DayPlanner.Hours(at("start", "09:00"), at("end", "18:00"), lunch, base.optInt("lunchMinutes", 60))
+    }
+
+    /**
+     * Each morning Kō proposes the day: until you accept it, the proposal is made again whenever the day is read, so
+     * meetings and tasks that came in since (a sync, a new task) are planned around. Not while the sample day shows.
+     */
+    private fun plan(date: String) {
+        if (dao.setting(SAMPLE_CLEARED) == null) return
+        val state = planState(date)
+        if (state == ACCEPTED || date < localDate()) return
+        val hours = hoursOn(date)
+        if (state == null && hours == null) return
+        val now = clock()
+        val onDay = dao.chunksOn(date)
+        val busy = onDay.filter { it.status == Chunk.PLANNED || it.status == Chunk.DONE }
+        val counted = dao.chunksOfOpenTasks().filter { it.status == Chunk.DONE || (it.status == Chunk.PLANNED && it.date == date) }
+            .groupBy { it.taskId }.mapValues { (_, cs) -> cs.sumOf { it.minutes } }
+        val chunk = CHUNK_SIZES.getOrElse(dao.setting("chunk")?.value?.toIntOrNull() ?: 1) { 25 }
+        val needs = dao.openTasks().filter { !it.id.startsWith(SampleDay.TASK_PREFIX) && it.source != "calendar" }
+            .map { DayPlanner.Need(it, (it.estimate ?: chunk) - (counted[it.id] ?: 0)) }
+        val from = if (date == localDate()) localMinutes() else 0
+        val proposal = hours?.let { DayPlanner.propose(date, it, from, busy, needs, chunk, now) } ?: emptyList()
+        // Save only what changed, so an unchanged proposal is not synced again.
+        val old = dao.proposedOn(date).associateBy { it.id }
+        val keep = proposal.map { it.id }.toSet()
+        val changed = proposal.filter { p -> old[p.id]?.copy(updatedAt = p.updatedAt) != p } + old.values.filter { it.id !in keep }.map { it.copy(deleted = true, updatedAt = now) }
+        if (changed.isNotEmpty()) saveChunks(changed)
+        if (state == null) saveSetting(Setting(PLAN + date, JSONObject.quote(PROPOSED), now))
+    }
+
     private fun snapshot(date: String): JSONObject {
         val day = LocalDate.parse(date)
-        val shown = setOf(Chunk.PLANNED, Chunk.DONE, Chunk.SKIPPED)
+        val shown = setOf(Chunk.PLANNED, Chunk.PROPOSED, Chunk.DONE, Chunk.SKIPPED)
+        val hours = hoursOn(date)
         return JSONObject()
             .put("date", date)
+            .put("plan", JSONObject().put("state", planState(date) ?: JSONObject.NULL)
+                .put("start", hours?.let { DayPlanner.clock(it.start) } ?: JSONObject.NULL).put("end", hours?.let { DayPlanner.clock(it.end) } ?: JSONObject.NULL)
+                .put("tasks", dao.openTasks().count { !it.id.startsWith(SampleDay.TASK_PREFIX) && it.source != "calendar" }))
             .put("workspaces", JSONArray(dao.workspaces().map { JSONObject().put("id", it.id).put("name", it.name).put("toolsAllowed", it.toolsAllowed) }))
             .put("chunks", JSONArray(dao.chunksOn(date).filter { it.status in shown }.map {
                 JSONObject().put("id", it.id).put("taskId", it.taskId).put("ws", it.workspaceId).put("start", it.start).put("minutes", it.minutes)
@@ -201,7 +285,10 @@ class FoundersStore(
                 JSONObject().put("who", it.who).put("ws", it.workspaceId ?: JSONObject.NULL).put("text", it.text ?: JSONObject.NULL).put("key", it.replyKey ?: JSONObject.NULL)
             }))
             .put("review", dao.review(date)?.let { JSONObject().put("feel", it.feel ?: JSONObject.NULL).put("slips", JSONObject(it.slips)) } ?: JSONObject.NULL)
-            .put("settings", JSONObject().apply { dao.settings().filter { it.id != ROLLED_TO && it.id != SAMPLE_CLEARED }.forEach { put(it.id, it.value) } })
+            .put("settings", JSONObject().apply {
+                dao.settings().filter { it.id != ROLLED_TO && it.id != SAMPLE_CLEARED && !it.id.startsWith(PLAN) && (!it.id.startsWith("$HOURS:") || it.id == "$HOURS:$date") }
+                    .forEach { put(it.id, it.value) }
+            })
     }
 
     private fun slipsOf(json: String): Map<String, Int> {
@@ -214,6 +301,14 @@ class FoundersStore(
     companion object {
         private const val ROLLED_TO = "rolledTo"
         private const val SAMPLE_CLEARED = "sampleCleared"
+        private const val PLAN = "plan:"              // plan:YYYY-MM-DD → "proposed" | "accepted"
+        private const val HOURS = "hours"             // the usual week; hours:YYYY-MM-DD → one day
+        private const val PROPOSED = "proposed"
+        private const val ACCEPTED = "accepted"
+        /** The category of tasks you give Kō for its plan. */
+        const val TASK = "task"
+        /** The chunk sizes in Settings (the "chunk" setting is the index). */
+        val CHUNK_SIZES = listOf(15, 25, 45)
         const val SAMPLE_UPDATED_AT = 1L
 
         /** A UUID that never ends in a or b: the screens read a trailing a/b as the half of a split chunk. */

@@ -55,6 +55,13 @@ export const MIGRATIONS = [
     "statements": [
       "CREATE TABLE google_accounts ( user_id TEXT PRIMARY KEY, refresh_token TEXT NOT NULL, scopes TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL, last_import_at INTEGER, last_import_date TEXT, last_error TEXT )"
     ]
+  },
+  {
+    "name": "0004_plan.sql",
+    "statements": [
+      "ALTER TABLE tasks ADD COLUMN estimate INTEGER",
+      "CREATE TABLE google_links ( user_id TEXT NOT NULL, email TEXT NOT NULL, refresh_token TEXT NOT NULL, scopes TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL, last_import_at INTEGER, last_error TEXT, PRIMARY KEY (user_id, email) )"
+    ]
   }
 ];
 
@@ -77,7 +84,8 @@ export const TABLES = {
     "status",
     "created_at",
     "updated_at",
-    "deleted"
+    "deleted",
+    "estimate"
   ],
   "chunks": [
     "id",

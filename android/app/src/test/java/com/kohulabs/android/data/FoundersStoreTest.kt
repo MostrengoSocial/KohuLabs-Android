@@ -122,4 +122,68 @@ class FoundersStoreTest {
         // Opening the app again the same day changes nothing.
         assertEquals(titles, chunks(store.today("2026-10-30", "en")).map { it.getString("title") })
     }
+
+    // ---- Kō's plan ----
+
+    private fun at(iso: String) { now = java.time.Instant.parse(iso).toEpochMilli() }
+    private fun realDay(date: String) {
+        store.today(date, "en")
+        db.openHelper.writableDatabase.execSQL("INSERT INTO nudges (id, kind, tone, time_label, title, body, actions, created_at, updated_at, deleted) VALUES ('brief:$date', 'Today', 'info', '08:00', 'Today', '…', '[]', 5, 5, 0)")
+    }
+    private fun meeting(date: String, start: String, minutes: Int) = db.openHelper.writableDatabase.execSQL(
+        "INSERT INTO chunks (id, task_id, workspace_id, date, start, minutes, title, category, status, updated_at, deleted) VALUES ('cal:$start', 'cal:$start', 'kohu', '$date', '$start', $minutes, 'Call', 'meet', 'planned', 5, 0)")
+    private fun planned(day: JSONObject) = chunks(day).filter { it.getString("category") != "meet" }.map { Triple(it.getString("start"), it.getInt("minutes"), it.getString("title")) to it.getString("status") }
+
+    @Test fun eachMorningKoProposesTheDayAndYouAcceptIt() {
+        store = FoundersStore(db, clock = { now }, newId = { "id${++n}" }, zone = java.time.ZoneOffset.UTC)
+        at("2026-11-02T08:00:00Z")                                   // a Monday, before work
+        realDay("2026-11-02")
+        assertEquals("proposed", store.today("2026-11-02", "en").getJSONObject("plan").getString("state"))
+        ops(op("task", "clientId" to "x", "ws" to "kohu", "title" to "Write proposal", "estimate" to 50, "due" to "2026-11-03"),
+            op("task", "ws" to "revolut", "title" to "Revolut deck", "estimate" to 25),
+            op("task", "ws" to "personal", "title" to "Later", "due" to "2026-11-20"))
+        meeting("2026-11-02", "09:30", 30)
+        var day = store.today("2026-11-02", "en")
+        // Soonest deadline first, around the meeting; tasks without a size get one chunk (25 minutes by default).
+        assertEquals(listOf(Triple("09:00", 25, "Write proposal") to "proposed", Triple("10:05", 25, "Write proposal") to "proposed",
+            Triple("10:35", 25, "Later") to "proposed", Triple("11:05", 25, "Revolut deck") to "proposed"), planned(day))
+        assertEquals(listOf("09:00", "18:00", 3), day.getJSONObject("plan").let { listOf(it.getString("start"), it.getString("end"), it.getInt("tasks")) })
+        // Read again, unchanged: nothing new to sync.
+        val queued = db.dao().outboxSize()
+        store.today("2026-11-02", "en")
+        assertEquals(queued, db.dao().outboxSize())
+
+        ops(op("plan", "date" to "2026-11-02", "action" to "accept"))
+        day = store.today("2026-11-02", "en")
+        assertEquals("accepted", day.getJSONObject("plan").getString("state"))
+        assertTrue(planned(day).all { it.second == "planned" })
+        // Once accepted, new things do not move the plan by themselves.
+        ops(op("task", "ws" to "kohu", "title" to "Call the accountant"))
+        assertEquals(4, planned(store.today("2026-11-02", "en")).size)
+
+        // "Today I work until 20:00", at 10:20: the rest of the day is planned again, for you to accept.
+        at("2026-11-02T10:20:00Z")
+        ops(op("setting", "key" to "hours:2026-11-02", "value" to "{\"end\":\"20:00\"}"), op("plan", "date" to "2026-11-02", "action" to "again"))
+        day = store.today("2026-11-02", "en")
+        assertEquals("20:00" to "proposed", day.getJSONObject("plan").let { it.getString("end") to it.getString("state") })
+        assertEquals(listOf(Triple("09:00", 25, "Write proposal") to "planned", Triple("10:05", 25, "Write proposal") to "planned",
+            Triple("10:35", 25, "Later") to "proposed", Triple("11:05", 25, "Revolut deck") to "proposed", Triple("11:35", 25, "Call the accountant") to "proposed"), planned(day))
+        assertTrue("hours:2026-11-02" in day.getJSONObject("settings").keys().asSequence().toList())
+    }
+
+    @Test fun noPlanOnADayOffUnlessYouSaySo() {
+        store = FoundersStore(db, clock = { now }, newId = { "id${++n}" }, zone = java.time.ZoneOffset.UTC)
+        at("2026-11-07T09:00:00Z")                                   // a Saturday
+        realDay("2026-11-07")
+        ops(op("task", "ws" to "kohu", "title" to "Write proposal"))
+        assertEquals(JSONObject.NULL, store.today("2026-11-07", "en").getJSONObject("plan").get("state"))
+        assertEquals(JSONObject.NULL, store.today("2026-11-07", "en").getJSONObject("plan").get("start"))
+        ops(op("setting", "key" to "hours:2026-11-07", "value" to "{\"start\":\"10:00\",\"end\":\"12:00\"}"))
+        val day = store.today("2026-11-07", "en")
+        assertEquals(listOf(Triple("10:00", 25, "Write proposal") to "proposed"), planned(day))
+        // And a working day you take off.
+        ops(op("setting", "key" to "hours:2026-11-09", "value" to "{\"off\":true}"))
+        assertEquals(null, store.hoursOn("2026-11-09"))
+        assertEquals(DayPlanner.Hours(540, 1080), store.hoursOn("2026-11-10"))
+    }
 }

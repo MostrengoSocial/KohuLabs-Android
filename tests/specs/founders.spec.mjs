@@ -133,8 +133,8 @@ test('in the Android app: the day comes from the phone database and changes are 
   await expect(page.getByText('Metrics section, 25 minutes.')).toHaveCount(0);
   await page.getByPlaceholder('Ask Kō or give him a task').fill('add: renew my passport');
   await page.keyboard.press('Enter');
-  await expect.poll(() => page.evaluate(() => window.ops.filter((o) => o.op === 'add').length)).toBe(1);
-  expect((await page.evaluate(() => window.ops)).find((o) => o.op === 'add')).toMatchObject({ clientId: 'f0', ws: 'personal', title: 'Renew my passport', minutes: 25 });
+  await expect.poll(() => page.evaluate(() => window.ops.filter((o) => o.op === 'task').length)).toBe(1);
+  expect((await page.evaluate(() => window.ops)).find((o) => o.op === 'task')).toMatchObject({ ws: 'personal', title: 'Renew my passport', estimate: null, due: null });
   expect((await page.evaluate(() => window.ops)).filter((o) => o.op === 'setting').map((o) => o.key)).toContain('mode');
 });
 
@@ -252,5 +252,81 @@ test('in the Android app: Kō’s home says what is planned and waiting; pull to
   await page.getByRole('button', { name: 'Mic' }).click();
   expect(await page.evaluate(() => window.calls)).toContain('listen:en');
   await page.evaluate(() => window.kohuFounders.heard('call the bank tomorrow morning'));
-  await expect(page.getByPlaceholder('A task, in your own words')).toHaveValue('call the bank tomorrow morning');
+  await expect(page.getByPlaceholder('Task, size, deadline')).toHaveValue('call the bank tomorrow morning');
+});
+
+// Kō's morning plan: a proposal in Today to accept or plan again; tasks with a size and deadline; your hours;
+// Revolut by voice; the personal Gmail in Settings. The store is stood in for: it records the operations and
+// serves a day with the proposal as the phone would.
+test('in the Android app: Kō proposes the day, you accept it; tasks, hours, Revolut and the personal Gmail', async ({ page }) => {
+  await page.addInitScript(() => {
+    const p = (id, start, title, ws = 'kohu') => ({ id, taskId: 't-' + title, ws, start, minutes: 25, title, category: 'task', status: 'proposed', startedAt: null });
+    window.state = { plan: { state: 'proposed', start: '09:00', end: '18:00', tasks: 2 },
+      chunks: [{ id: 'cal:a', ws: 'kohu', start: '10:00', minutes: 30, title: 'Investor sync', category: 'meet', status: 'planned', startedAt: null },
+        p('plan:x:0900', '09:00', 'Write proposal'), p('plan:x:0930', '09:30', 'Write proposal'), p('plan:x:1035', '10:35', 'Revolut deck', 'revolut')] };
+    window.ops = []; window.calls = [];
+    window.KohuAndroid = {
+      platform: () => 'android', setAlarm: () => true, canListen: () => true, listen: (l) => window.calls.push('listen:' + l),
+      account: () => JSON.stringify({ email: 'hello@kohulabs.com' }),
+      today: (date) => JSON.stringify({ date, goals: [], nudges: [], alarms: [], messages: [], review: null, workspaces: [], settings: { mode: '"general"' }, ...window.state,
+        followUps: [{ id: 'gl:ab12cd34:th9', ws: 'personal', person: 'Mãe', what: 'Jantar', direction: 'you', days: 0, source: 'jhenriquejduarte@gmail.com', nudged: false }] }),
+      apply: (json) => {
+        const list = JSON.parse(json); window.ops.push(...list);
+        for (const o of list) if (o.op === 'plan' && o.action === 'accept') { window.state.plan.state = 'accepted'; window.state.chunks.forEach((c) => { if (c.status === 'proposed') c.status = 'planned'; }); }
+        return JSON.stringify({ ids: {} });
+      },
+      loadLinks: () => window.calls.push('links'), linkGmail: () => window.calls.push('link'), unlink: (e) => window.calls.push('unlink:' + e),
+    };
+  });
+  await page.goto('/founders/?screen=home');
+  // Kō's home says the day is planned and waits for you.
+  await expect(page.locator('.kf-note')).toHaveText('I planned today: 3 chunks for 2 tasks, 09:00 to 11:00. Tap to review and accept. 1 email waiting on you.');
+  await page.locator('.kf-note').click();
+  const plan = page.locator('.kf-plan');
+  await expect(plan).toContainText('3 chunks for 2 tasks.');
+  await expect(plan).toContainText('09:00 to 11:00, around your meetings and lunch, in your hours (09:00–18:00).');
+  await expect(page.getByText('Task · 25 min · Revolut · proposed')).toBeVisible();
+
+  // A task in the box: its size, deadline and workspace are read from how you say it.
+  await page.getByPlaceholder('Task, size, deadline').fill('revolut onboarding review 1.5h by friday');
+  await page.keyboard.press('Enter');
+  const task = (await page.evaluate(() => window.ops)).find((o) => o.op === 'task');
+  expect(task).toMatchObject({ ws: 'revolut', title: 'Revolut onboarding review', estimate: 90 });
+  expect(task.due).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  expect(new Date(task.due + 'T12:00').getDay()).toBe(5);
+
+  // Revolut: Kō asks, you answer by voice, it becomes a Revolut task.
+  await plan.getByRole('button', { name: 'Anything for Revolut today? Tell me ›' }).click();
+  expect(await page.evaluate(() => window.calls)).toContain('listen:en');
+  await page.evaluate(() => window.kohuFounders.heard('prepare the quarterly review 2 hours by tomorrow'));
+  await expect.poll(() => page.evaluate(() => window.ops.filter((o) => o.op === 'task').length)).toBe(2);
+  expect((await page.evaluate(() => window.ops)).filter((o) => o.op === 'task')[1]).toMatchObject({ ws: 'revolut', title: 'Prepare the quarterly review', estimate: 120 });
+
+  // Your hours today: saved for today, and the rest of the day is planned again.
+  await page.getByPlaceholder('Ask Kō or give him a task').fill('today I work until 8pm');
+  await page.keyboard.press('Enter');
+  const hours = (await page.evaluate(() => window.ops)).find((o) => o.op === 'setting' && o.key.startsWith('hours:'));
+  expect(JSON.parse(hours.value)).toEqual({ end: '20:00' });
+  await page.getByPlaceholder('Ask Kō or give him a task').fill('tomorrow I start at 11');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText(/^Got it: tomorrow from 11:00\. I’ll plan with that\.$/)).toBeVisible();
+
+  // Accept: the proposal becomes the plan; the card goes.
+  await page.locator('nav button').nth(0).click();
+  await page.locator('.kf-note').click();
+  await page.locator('.kf-plan').getByRole('button', { name: 'Accept' }).click();
+  expect((await page.evaluate(() => window.ops)).filter((o) => o.op === 'plan').map((o) => o.action)).toEqual(['accept']);
+  await expect(page.locator('.kf-plan')).toHaveCount(0);
+  await expect(page.getByText('Task · 25 min · Revolut · proposed')).toHaveCount(0);
+
+  // Settings: connect the personal Gmail; its mail opens in that account.
+  await page.locator('nav button').nth(4).click();
+  await page.getByRole('button', { name: 'Connect' }).click();
+  expect(await page.evaluate(() => window.calls)).toEqual(expect.arrayContaining(['links', 'link']));
+  await page.evaluate(() => window.kohuFounders.links({ links: [{ email: 'jhenriquejduarte@gmail.com', lastImportAt: 1, lastError: null }] }));
+  await expect(page.getByText('jhenriquejduarte@gmail.com')).toBeVisible();
+  await page.getByRole('button', { name: 'Remove' }).click();
+  expect(await page.evaluate(() => window.calls)).toContain('unlink:jhenriquejduarte@gmail.com');
+  expect(await page.evaluate(() => window.kohuFounders.gmailUrl({ id: 'gl:ab12cd34:th9', src: 'jhenriquejduarte@gmail.com' }))).toBe('https://mail.google.com/mail/?authuser=jhenriquejduarte%40gmail.com#all/th9');
+  expect(await page.evaluate(() => window.kohuFounders.gmailUrl({ id: 'gm:th1', src: 'Gmail' }))).toBe('https://mail.google.com/mail/?authuser=hello%40kohulabs.com#all/th1');
 });

@@ -549,13 +549,61 @@
   const PULL_AT = 80; // px to drag before a release refreshes
   const canListen = !!(phone && typeof phone.canListen === 'function' && phone.canListen());
   const ids = {}; // chunks named in this session (f0, f1 ...) → their id in the database
+  const WEEKDAYS = { en:['sunday','monday','tuesday','wednesday','thursday','friday','saturday'], pt:['domingo','segunda','terça','quarta','quinta','sexta','sábado'] };
+  const dayAfter = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return dateKey(d); };
+  // "friday", "sexta(-feira)", "tomorrow", "amanhã", "today", "hoje", "12/11": the date it means (the next one).
+  function dateIn(text) {
+    const low = text.toLowerCase();
+    if (/\b(today|hoje)\b/.test(low)) return today;
+    if (/\b(tomorrow|amanhã|amanha)\b/.test(low)) return dayAfter(1);
+    for (const names of [WEEKDAYS.en, WEEKDAYS.pt, WEEKDAYS.en.map(d => d.slice(0, 3))]) {
+      const i = names.findIndex(d => new RegExp(`\\b${d}`).test(low));
+      if (i >= 0) return dayAfter((i - new Date().getDay() + 7) % 7);
+    }
+    const m = low.match(/\b(\d{1,2})\/(\d{1,2})\b/);
+    if (m && +m[2] >= 1 && +m[2] <= 12 && +m[1] >= 1 && +m[1] <= 31) {
+      const y = new Date().getFullYear(), d = `${y}-${pad(+m[2])}-${pad(+m[1])}`;
+      return d >= today ? d : `${y + 1}-${pad(+m[2])}-${pad(+m[1])}`;
+    }
+    return null;
+  }
+  // A task as you'd say it: "proposal for Ana 2h by Friday", "revolut: review onboarding doc 45 min", "#pessoal IRS até sexta".
+  function parseTask(text, ws) {
+    let x = ' ' + text.trim() + ' ', estimate = null, due = null;
+    const tag = x.match(/#(kohu|revolut|personal|pessoal)\b/i);
+    if (tag) { ws = { pessoal:'personal' }[tag[1].toLowerCase()] || tag[1].toLowerCase(); x = x.replace(tag[0], ' '); }
+    else if (/\brevolut\b/i.test(x)) ws = 'revolut';
+    const size = x.match(/\s(\d+(?:[.,]\d+)?)\s*(h|hr|hrs|hours?|horas?|m|min|mins|minutes?|minutos?)(?=[\s.,;]|$)/i);
+    if (size) { const n = parseFloat(size[1].replace(',', '.')); estimate = Math.round(/^h/i.test(size[2]) ? n * 60 : n); x = x.replace(size[0], ' '); }
+    else if (/\b(half an hour|meia hora)\b/i.test(x)) { estimate = 30; x = x.replace(/\b(half an hour|meia hora)\b/i, ' '); }
+    const when = x.match(/\s(?:by|until|till|due|before|até|para)\s+(?:o |a |à |ao )?(today|tomorrow|hoje|amanhã|amanha|\d{1,2}\/\d{1,2}|[a-zà-ú]+(?:-feira)?)(?=[\s.,;]|$)/i)
+      || x.match(/\s(today|tomorrow|hoje|amanhã|amanha)[\s.,;]*$/i);
+    if (when && dateIn(when[1])) { due = dateIn(when[1]); x = x.replace(when[0], ' '); }
+    const title = x.replace(/\s+/g, ' ').replace(/^[\s:,.-]+|[\s:,.-]+$/g, '');
+    return { title: title ? title[0].toUpperCase() + title.slice(1) : '', estimate, due, ws };
+  }
+  // "today I work until 20:00", "tomorrow I start at 11", "friday off", "hoje trabalho até às 20", "amanhã começo às 11".
+  function parseHours(text) {
+    const low = text.toLowerCase();
+    if (!/work|start|finish|stop|late|early|off|trabalh|começ|comec|acab|saio|entro|folga|livre/.test(low)) return null;
+    const date = dateIn(low) || today;
+    if (/\b(day off|off|not working|no work|folga|não trabalho|nao trabalho|dia livre)\b/.test(low) && !/\b(until|till|até|ate)\b/.test(low)) return { date, off: true };
+    const time = (h, m, ap) => { let hh = +h; if (/pm/.test(ap || '') && hh < 12) hh += 12; return hh > 23 || +(m || 0) > 59 ? null : `${pad(hh)}:${pad(+(m || 0))}`; };
+    const out = { date };
+    const end = low.match(/\b(?:until|till|to|até|ate)\s*(?:as |às |à |a )?(\d{1,2})(?:[:h.](\d{2}))?\s*(am|pm)?/);
+    if (end) { let t = time(end[1], end[2], end[3]); if (t && !end[3] && +end[1] < 9) t = time(+end[1] + 12, end[2]); if (t) out.end = t; }
+    const start = low.match(/\b(?:start|starting|begin|from|começo|comecar|começar|entro|a partir das?)\s*(?:at |as |às |à |a )?(\d{1,2})(?:[:h.](\d{2}))?\s*(am|pm)?/);
+    if (start) { const t = time(start[1], start[2], start[3]); if (t) out.start = t; }
+    return out.end || out.start ? out : null;
+  }
 
   let day = null;
   if (store) {
     try { day = JSON.parse(store.today(today, props.lang)); } catch (e) { console.warn('Kō: no database, showing the sample day', e); }
   }
   const settings = {};
-  if (day) {
+  // The day from the phone's database into the design's data (again after a change Kō plans around: App.reloadDay).
+  function hydrate() {
     for (const [k, v] of Object.entries(day.settings || {})) { try { settings[k] = JSON.parse(v); } catch (e) { /* skip a bad value */ } }
     if (settings.lang) props.lang = settings.lang;
     // Today's real date, in both languages.
@@ -563,7 +611,7 @@
     const long = (l, x) => l === 'pt' ? `${NAMES.pt.dl[x.getDay()]}, ${x.getDate()} de ${NAMES.pt.ml[x.getMonth()]}` : `${NAMES.en.dl[x.getDay()]}, ${x.getDate()} ${NAMES.en.ml[x.getMonth()]}`;
     for (const l of ['en', 'pt']) Object.assign(T[l], { date:`${NAMES[l].d[now.getDay()]} ${now.getDate()} ${NAMES[l].m[now.getMonth()]}`, lockDate:long(l, now), ringDate:long(l, tomorrow) });
     // Meetings imported from Calendar (api/google-import.js); not tappable (the design's meeting screen is its sample).
-    GROUPS.meet = ['Meeting', 'Reunião']; SOURCE.meet = 'Calendar';
+    GROUPS.meet = ['Meeting', 'Reunião']; SOURCE.meet = 'Calendar'; GROUPS.task = ['Task', 'Tarefa'];
     const rows = ws => day.chunks.filter(c => c.ws === ws).map(c => { if (!GROUPS[c.category]) GROUPS[c.category] = [c.category, c.category]; return [c.id, c.start, c.minutes, c.title, c.title, c.category]; });
     fill(DAY, rows('kohu')); fill(DAY_P, rows('personal')); fill(DAY_R, rows('revolut'));
     for (const ws of ['kohu', 'personal', 'revolut']) GOALS[ws] = day.goals.filter(g => g.ws === ws).map(g => [g.id, g.title, g.title]);
@@ -574,8 +622,9 @@
     fill(ALARMS, day.alarms.map(a => ({ id:a.id, time:a.time, label:[a.label, a.label], days:[a.days, a.days], on:a.on, byKo:a.byKo, brief:a.brief })));
     // The day review lists whatever is still open as slipped (the design names its sample chunks).
     const open = () => { const app = window.kohuFounders; return app ? app.chunks().filter(c => !c.isDone).flatMap(c => [c.id, c.id.replace(/[ab]$/, '')]) : []; };
-    for (const ws of ['kohu', 'personal', 'revolut', 'general']) Object.defineProperty(SLIP, ws, { get:open });
+    for (const ws of ['kohu', 'personal', 'revolut', 'general']) Object.defineProperty(SLIP, ws, { get:open, configurable:true });
   }
+  if (day) hydrate();
 
   // Remembers the language and whether onboarding is done, so a reload opens on Today.
   class App extends Component {
@@ -610,6 +659,73 @@
       return v;
     }
 
+    // Kō's proposal is shown in the day but is not "now" until you accept it.
+    chunks() {
+      const list = super.chunks();
+      if (!day) return list;
+      const prop = new Set(day.chunks.filter(c => c.status === 'proposed').map(c => c.id));
+      if (!prop.size) return list;
+      const now = list.find(c => !c.isDone && !this.state.skipped.includes(c.id) && !prop.has(c.id));
+      return list.map(c => ({ ...c, isNow: !!now && c.id === now.id, proposed: prop.has(c.id) }));
+    }
+    // Reads the day again from the phone's database (after a task, new hours or the plan changed) and shows it.
+    reloadDay() {
+      this.persist();
+      try { day = JSON.parse(store.today(today, this.lang())); } catch (e) { return; }
+      hydrate();
+      const has = st => day.chunks.filter(c => c.status === st).map(c => c.id);
+      this.setState({ done:has('done'), skipped:has('skipped') });
+      this.persisted = this.snap();
+    }
+    planAction(action) {
+      store.apply(JSON.stringify([{ op:'plan', date:today, action }]));
+      this.reloadDay();
+    }
+    planFacts() {
+      const plan = day.plan || {}, proposed = day.chunks.filter(c => c.status === 'proposed');
+      const tasks = new Set(proposed.map(c => c.taskId)).size, last = proposed[proposed.length - 1];
+      const end = last ? (() => { const [h, m] = last.start.split(':').map(Number), t = h * 60 + m + last.minutes; return `${pad(Math.floor(t / 60))}:${pad(t % 60)}`; })() : null;
+      return { state: plan.state, start: plan.start, end: plan.end, open: plan.tasks || 0, proposed, tasks, from: proposed.length ? proposed[0].start : null, to: end };
+    }
+    // A task you give Kō (task box, chat, voice): saved with its size and deadline, then planned.
+    addTask(text, ws) {
+      const say = (en, pt) => this.say(en, pt), t = parseTask(text, ws || (this.mode() === 'general' ? this.state.feedTarget : this.mode()));
+      if (!t.title) return '';
+      store.apply(JSON.stringify([{ op:'task', ws:t.ws, title:t.title, estimate:t.estimate, due:t.due }]));
+      this.reloadDay();
+      const L = this.lang() === 'pt' ? 1 : 0, p = this.planFacts();
+      const size = t.estimate ? (t.estimate >= 60 ? `${+(t.estimate / 60).toFixed(1)}h` : `${t.estimate} min`) : say('one chunk', 'um bloco');
+      const due = t.due ? say(`, due ${t.due === today ? 'today' : t.due === dayAfter(1) ? 'tomorrow' : t.due.slice(5).split('-').reverse().join('/')}`, `, até ${t.due === today ? 'hoje' : t.due === dayAfter(1) ? 'amanhã' : t.due.slice(5).split('-').reverse().join('/')}`) : '';
+      return say(`Added: ${t.title} (${size}${due}, ${WS[t.ws][L]}).`, `Junto: ${t.title} (${size}${due}, ${WS[t.ws][L]}).`) + ' ' +
+        (p.state === 'proposed' ? (p.proposed.some(c => c.title === t.title) ? say('It’s in today’s proposal.', 'Está na proposta de hoje.') : say('It doesn’t fit today; I’ll plan it next.', 'Hoje já não cabe; planeio-a a seguir.'))
+          : p.state === 'accepted' ? say('Say “plan again” to fit it into today.', 'Diz “planeia de novo” para a encaixar hoje.') : say('I’ll plan it on your next working day.', 'Planeio-a no próximo dia de trabalho.'));
+    }
+    feed(raw) { return day ? this.addTask(raw) : super.feed(raw); }
+    // Working hours for a day, as you told Kō; today's plan follows them.
+    setHours(h) {
+      const say = (en, pt) => this.say(en, pt), key = `hours:${h.date}`;
+      const was = h.date === today && settings[key] && !settings[key].off ? settings[key] : {};
+      const value = h.off ? { off: true } : { ...was, ...(h.start ? { start: h.start } : {}), ...(h.end ? { end: h.end } : {}) };
+      store.apply(JSON.stringify([{ op:'setting', key, value:JSON.stringify(value) }]));
+      settings[key] = value;
+      const when = h.date === today ? say('today', 'hoje') : h.date === dayAfter(1) ? say('tomorrow', 'amanhã') : h.date.slice(5).split('-').reverse().join('/');
+      if (h.date !== today) return h.off ? say(`Got it: ${when} off.`, `Combinado: ${when} de folga.`) : say(`Got it: ${when} ${h.start ? `from ${h.start}` : ''}${h.start && h.end ? ' ' : ''}${h.end ? `until ${h.end}` : ''}. I’ll plan with that.`, `Combinado: ${when} ${h.start ? `a partir das ${h.start}` : ''}${h.start && h.end ? ' ' : ''}${h.end ? `até às ${h.end}` : ''}. Planeio com isso.`);
+      if (this.planFacts().state === 'accepted') store.apply(JSON.stringify([{ op:'plan', date:today, action:'again' }]));
+      this.reloadDay();
+      const p = this.planFacts();
+      if (h.off) return say('Got it: today off. Nothing more planned.', 'Combinado: hoje de folga. Não planeio mais nada.');
+      return say(`Got it: today ${p.start}–${p.end}. I planned the rest of the day again: ${p.proposed.length} chunks to review in Today.`, `Combinado: hoje ${p.start}–${p.end}. Planeei de novo o resto do dia: ${p.proposed.length} blocos para veres no Hoje.`);
+    }
+    // Personal Gmail and other accounts added to the import (KohuBridge.loadLinks / linkGmail / unlink).
+    links(res) { this.setState({ links: res && res.links ? res.links : [] }); }
+    linked(res) {
+      const say = (en, pt) => this.say(en, pt), err = res && res.error;
+      const msg = !err ? say(`${res.email} connected`, `${res.email} ligado`) : err === 'same_account' ? say('That’s the account you signed in with', 'Essa é a conta com que entraste') : err === 'no_gmail' ? say('Gmail access wasn’t allowed', 'O acesso ao Gmail não foi permitido') : err === 'cancelled' ? say('Cancelled', 'Cancelado') : say('Couldn’t connect it', 'Não consegui ligar');
+      this.setState({ refreshMsg: msg });
+      this.later(() => this.setState({ refreshMsg: null }), 2600);
+      if (!err && typeof phone.loadLinks === 'function') phone.loadLinks();
+    }
+
     // ---- the app shows only what is true ----------------------------------------------------------------------------
     // The design fills every screen with its sample. In the app (day from the phone's database) the parts that are not
     // built yet are hidden (demo: false in index.html) or show real numbers, and Kō only says what it knows.
@@ -633,7 +749,31 @@
       t.focusKo = f.next ? say(`Up next: ${f.next.title} at ${f.next.time}.`, `A seguir: ${f.next.title} às ${f.next.time}.`) : say('This is the last chunk today.', 'É o último bloco de hoje.');
       t.revKo = say(`You finished ${f.done} of ${f.list.length} chunks today.`, `Acabaste ${f.done} de ${f.list.length} blocos hoje.`);
       t.alKo = say('Ask Kō for an alarm (“wake me at 6:45”) and it goes into your phone’s Clock app. Change or delete it there.', 'Pede um alarme ao Kō (“acorda-me às 6:45”) e ele vai para a app Relógio do telemóvel. Muda-o ou apaga-o lá.');
-      t.folKo = say('Unread mail from your inbox, refreshed every hour. Promotions, social and updates are left out.', 'Email por ler da tua caixa de entrada, atualizado de hora a hora. Promoções, social e atualizações ficam de fora.');
+      t.folKo = say('Unread mail from people: hello@ for Kohu, your personal Gmail for Personal. Refreshed every hour; newsletters and automated mail are left out.', 'Email por ler de pessoas: hello@ para a Kohu, o teu Gmail pessoal para Pessoal. Atualizado de hora a hora; newsletters e email automático ficam de fora.');
+      t.feedIdle = t.feedIdleR = say('Tell Kō a task: “proposal for Ana 2h by Friday”. He plans it into your working hours.', 'Dá uma tarefa ao Kō: “proposta para a Ana 2h até sexta”. Ele planeia-a no teu horário.');
+      t.feedPh = say('Task, size, deadline', 'Tarefa, tamanho, prazo');
+      out.canFeed = true;
+      // Kō's plan for today: a proposal to accept, or plan again. Revolut can't be connected, so Kō asks.
+      const p = this.planFacts();
+      out.planShow = p.state === 'proposed';
+      out.planEyebrow = say('Kō’s plan for today', 'O plano do Kō para hoje');
+      out.planTitle = p.proposed.length ? say(`${p.proposed.length} chunk${p.proposed.length === 1 ? '' : 's'} for ${p.tasks} task${p.tasks === 1 ? '' : 's'}.`, `${p.proposed.length} bloco${p.proposed.length === 1 ? '' : 's'} para ${p.tasks} tarefa${p.tasks === 1 ? '' : 's'}.`)
+        : say('Nothing to plan yet.', 'Ainda nada para planear.');
+      out.planBody = p.proposed.length ? say(`${p.from} to ${p.to}, around your meetings and lunch, in your hours (${p.start}–${p.end}). Accept it or tell me what to change.`, `${p.from} às ${p.to}, à volta das reuniões e do almoço, no teu horário (${p.start}–${p.end}). Aceita ou diz-me o que mudar.`)
+        : p.open ? say('Your open tasks don’t fit in what’s left of today’s hours.', 'As tarefas em aberto não cabem no que resta do horário de hoje.') : say('No open tasks. Add one below: “proposal for Ana 2h by Friday”.', 'Sem tarefas em aberto. Junta uma abaixo: “proposta para a Ana 2h até sexta”.');
+      out.planCanAccept = p.proposed.length > 0;
+      out.planAcceptLabel = say('Accept', 'Aceitar');
+      out.planAgainLabel = say('Plan again', 'Planear de novo');
+      out.planAccept = () => this.planAction('accept');
+      out.planAgain = () => this.planAction('again');
+      out.planRevolutText = say('Anything for Revolut today? Tell me ›', 'Algo da Revolut hoje? Diz-me ›');
+      out.planRevolut = () => { this.forWs = 'revolut'; this.setState({ screen:'ko', input:'' }); if (canListen) this.listenFor('ko'); };
+      out.others = v.others.map(c => c.proposed ? { ...c, meta: c.meta + say(' · proposed', ' · proposta'), opacity: 0.6 } : c);
+      // Settings: the Gmail accounts brought into the follow-ups.
+      const links = this.state.links || [];
+      out.showLinks = typeof phone.linkGmail === 'function';
+      out.linkRows = [...links.map(l => ({ name: l.email, note: l.lastError ? say('Sign in again', 'Entra outra vez') : say('Personal · mail', 'Pessoal · email'), action: say('Remove', 'Remover'), onClick: () => phone.unlink(l.email) })),
+        ...(links.length ? [] : [{ name: say('Personal Gmail', 'Gmail pessoal'), note: say('Not connected', 'Não ligado'), action: say('Connect', 'Ligar'), onClick: () => phone.linkGmail() }])];
       // Home: no focus guard yet; Kō's message says what is planned and what is waiting (tap it for Today).
       out.homeTiles = v.homeTiles.filter(b => b.label !== v.t.hGuard);
       out.homeNote = this.homeNote(f);
@@ -653,20 +793,20 @@
       if (S.listening) Object.assign(out, S.listening === 'feed' ? { feedMicBorder: 'var(--accent)', feedMicBg: 'var(--accent)', feedMicColor: 'var(--accent-ink)' } : { micBorder: 'var(--accent)', micBg: 'var(--accent)', micColor: 'var(--accent-ink)' });
       // Kō: no AI yet, so a greeting from the real day and replies only for what it can really do (send()).
       out.modelName = say('Kō · no AI yet', 'Kō · ainda sem IA');
-      out.koHint = say('Ask what’s next, add a task (“add: …”) or set an alarm.', 'Pergunta o que vem a seguir, junta uma tarefa (“junta: …”) ou marca um alarme.');
+      out.koHint = say('Add a task (“add: deck 1h by Friday”), change today’s hours, “plan again”, or set an alarm.', 'Junta uma tarefa (“junta: deck 1h até sexta”), muda o horário de hoje, “planeia de novo” ou marca um alarme.');
       const hello = f.list.length ? say(`Hi. ${f.left} of ${f.list.length} chunks left today${f.meetings ? `, ${f.meetings} of them meetings` : ''}.`, `Olá. Faltam ${f.left} de ${f.list.length} blocos hoje${f.meetings ? `, ${f.meetings} deles reuniões` : ''}.`)
         : say('Hi. Nothing planned today yet. Add a task with “add: …”.', 'Olá. Ainda nada planeado hoje. Junta uma tarefa com “junta: …”.');
       // (scripted replies saved before this version are left out: they were the design's sample answers)
       out.messages = v.messages.map((m, i) => i === 0 && m.isKo ? { ...m, text: hello, hasItems: false, hasTools: false } : m)
         .filter((m, i) => i === 0 || !(this.state.messages[i] && this.state.messages[i].key));
-      out.chips = [[say('What’s next?', 'O que vem a seguir?'), true], [say('What’s today?', 'Como está o dia?'), true], [say('Add: ', 'Junta: '), false], [say('Wake me at 7:00', 'Acorda-me às 7:00'), true]]
+      out.chips = [[say('What’s next?', 'O que vem a seguir?'), true], [say('Add: ', 'Junta: '), false], [say('Today I work until ', 'Hoje trabalho até às '), false], [say('Plan again', 'Planeia de novo'), true], [say('Wake me at 7:00', 'Acorda-me às 7:00'), true]]
         .map(([label, send]) => ({ label, onClick: send ? () => this.send(label) : () => this.setState({ input: label }) }));
       out.askAlarm = () => { this.go('ko'); this.setState({ input: say('Wake me at ', 'Acorda-me às ') }); };
       // Follow-ups from Gmail: open the thread, or mark it done.
       const you = FOL_YOU.filter(x => this.inMode(x.ws) && !this.state.folDone.includes(x.id));
       const done = id => () => this.setState(s => ({ folDone: [...s.folDone, id] }));
       out.folYou = v.folYou.map((x, i) => ({ ...x, actions: [
-        ...(you[i] && you[i].id.startsWith('gm:') ? [{ label: say('Open in Gmail', 'Abrir no Gmail'), cls: 'k-chip k-primary', onClick: () => { location.href = 'https://mail.google.com/mail/u/0/#all/' + you[i].id.slice(3); } }] : []),
+        ...(you[i] && /^g[ml]:/.test(you[i].id) ? [{ label: say('Open in Gmail', 'Abrir no Gmail'), cls: 'k-chip k-primary', onClick: () => { location.href = this.gmailUrl(you[i]); } }] : []),
         { label: v.t.done, cls: 'k-chip', onClick: done(you[i] && you[i].id) }] }));
       // Settings: what the app really has access to.
       out.scopeRows = [[say('Calendar', 'Calendário'), say('Read only', 'Só leitura')], ['Gmail', say('Senders and subjects', 'Remetentes e assuntos')], [say('Session', 'Sessão'), say('90 days', '90 dias')]].map(([name, value]) => ({ name, value }));
@@ -687,18 +827,28 @@
       return out;
     }
 
-    // Kō's line on the home screen: the day so far and what is waiting on you, from the real data.
+    // A thread in Gmail, in the right account: the linked one (its address is the source) or the signed-in one.
+    gmailUrl(x) {
+      const thread = x.id.split(':').pop();
+      let user = x.id.startsWith('gl:') ? x.src : null;
+      if (!user) { try { user = (JSON.parse(phone.account()) || {}).email; } catch (e) { /* not signed in */ } }
+      return `https://mail.google.com/mail/${user ? `?authuser=${encodeURIComponent(user)}` : 'u/0/'}#all/${thread}`;
+    }
+    // Kō's line on the home screen: the plan, the day so far and what is waiting on you, from the real data.
     homeNote(f) {
       const say = (en, pt) => this.say(en, pt), n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
-      const parts = [];
-      if (!f.list.length) parts.push(say('Nothing planned for today yet. Tell me what you need to do.', 'Ainda nada planeado para hoje. Diz-me o que tens de fazer.'));
+      const parts = [], p = this.planFacts();
+      if (p.state === 'proposed' && p.proposed.length) parts.push(say(`I planned today: ${n(p.proposed.length, 'chunk', 'chunks')} for ${n(p.tasks, 'task', 'tasks')}, ${p.from} to ${p.to}. Tap to review and accept.`, `Planeei o dia: ${n(p.proposed.length, 'bloco', 'blocos')} para ${n(p.tasks, 'tarefa', 'tarefas')}, ${p.from} às ${p.to}. Toca para ver e aceitar.`));
+      else if (p.state === 'proposed' && !f.list.length) parts.push(say('Nothing to plan today: no open tasks. Tell me what you need to do.', 'Nada para planear hoje: sem tarefas em aberto. Diz-me o que tens de fazer.'));
+      else if (!p.state && !p.start && !f.list.length) parts.push(say('Day off: nothing planned.', 'Dia de folga: nada planeado.'));
+      else if (!f.list.length) parts.push(say('Nothing planned for today yet. Tell me what you need to do.', 'Ainda nada planeado para hoje. Diz-me o que tens de fazer.'));
       else if (!f.left) parts.push(say(`Day done: all ${f.list.length} chunks finished.`, `Dia feito: os ${f.list.length} blocos estão acabados.`));
       else {
         const meet = f.list.find(c => c.group === 'meet' && !c.isDone);
         parts.push(say(`Today: ${n(f.left, 'chunk', 'chunks')} left`, `Hoje: ${n(f.left, 'bloco', 'blocos')} por fazer`) +
           (meet ? say(`, next meeting ${meet.time} ${meet.title}`, `, próxima reunião ${meet.time} ${meet.title}`) : '') + '.');
       }
-      const mail = FOL_YOU.filter(x => this.inMode(x.ws) && !this.state.folDone.includes(x.id) && x.id.startsWith('gm:')).length;
+      const mail = FOL_YOU.filter(x => this.inMode(x.ws) && !this.state.folDone.includes(x.id) && /^g[ml]:/.test(x.id)).length;
       if (mail) parts.push(say(`${n(mail, 'email', 'emails')} waiting on you.`, `${n(mail, 'email', 'emails')} à tua espera.`));
       const r = this.lastRefresh;
       if (r && r.ok === false && r.error !== 'no_google') parts.push(say('I couldn’t reach Google just now.', 'Não consegui chegar ao Google agora.'));
@@ -729,6 +879,7 @@
       this.setState({ listening: null });
       if (!text) return;
       if (target === 'feed') this.setState({ feedInput: text });
+      else if (this.forWs) { const ws = this.forWs; this.forWs = null; this.send(`add #${ws}: ${text}`); }
       else this.send(text);
     }
 
@@ -800,7 +951,20 @@
         return say(`Done: an alarm at ${time} in your Clock app.`, `Feito: um alarme às ${time} na app Relógio.`);
       }
       const add = q.match(/^\s*(?:add|junta|adiciona)\s*:?\s*(.+)$/i);
-      if (add) return this.feed(add[1]);
+      if (add) { const ws = this.forWs; this.forWs = null; return this.addTask(add[1], ws) || say('What’s the task?', 'Qual é a tarefa?'); }
+      if (this.forWs) { const ws = this.forWs; this.forWs = null; return this.addTask(q, ws); }
+      if (/^(accept|ok,? (?:accept|plan)|aceit|aceito)/.test(low)) {
+        if (this.planFacts().state !== 'proposed' || !this.planFacts().proposed.length) return say('There’s no proposal to accept right now.', 'Agora não há proposta para aceitar.');
+        this.planAction('accept');
+        return say('Accepted. Today is planned.', 'Aceite. O dia está planeado.');
+      }
+      if (/plan (?:it |the day |today )?again|re-?plan|plan my day|planeia (?:de novo|outra vez|o dia)|replaneia/.test(low)) {
+        this.planAction('again');
+        const p = this.planFacts();
+        return p.proposed.length ? say(`New proposal: ${p.proposed.length} chunks, ${p.from} to ${p.to}. Accept it in Today.`, `Nova proposta: ${p.proposed.length} blocos, ${p.from} às ${p.to}. Aceita no Hoje.`) : say('Nothing to plan in what’s left of today.', 'Não há nada para planear no que resta de hoje.');
+      }
+      const hours = parseHours(q);
+      if (hours) return this.setHours(hours);
       if (/next|now|seguir|agora/.test(low)) {
         if (!f.now) return say('Nothing left today.', 'Já não há nada hoje.');
         return say(`Now: ${f.now.title}, ${f.now.min} min.`, `Agora: ${f.now.title}, ${f.now.min} min.`) + (f.next ? say(` Then ${f.next.title} at ${f.next.time}.`, ` Depois ${f.next.title} às ${f.next.time}.`) : '');
@@ -810,8 +974,8 @@
         const items = f.list.filter(c => !c.isDone).slice(0, 6).map(c => `${c.time} ${c.title}`).join('; ');
         return say(`${f.left} of ${f.list.length} left${f.meetings ? `, ${f.meetings} meetings` : ''}: ${items}.`, `Faltam ${f.left} de ${f.list.length}${f.meetings ? `, ${f.meetings} reuniões` : ''}: ${items}.`);
       }
-      return say('I can’t answer that yet: my AI comes in a next update. For now I can tell you what’s next or how today looks, add a task (“add: …”) or set an alarm (“wake me at 6:45”).',
-        'Ainda não sei responder a isso: a minha IA chega numa próxima atualização. Por agora digo-te o que vem a seguir ou como está o dia, junto uma tarefa (“junta: …”) ou marco um alarme (“acorda-me às 6:45”).');
+      return say('I can’t answer that yet: my AI comes in a next update. For now: what’s next, how today looks, a task (“add: proposal 2h by Friday”), your hours (“today I work until 20:00”), “plan again”, or an alarm (“wake me at 6:45”).',
+        'Ainda não sei responder a isso: a minha IA chega numa próxima atualização. Por agora: o que vem a seguir, como está o dia, uma tarefa (“junta: proposta 2h até sexta”), o horário (“hoje trabalho até às 20”), “planeia de novo” ou um alarme (“acorda-me às 6:45”).');
     }
     // The Android back button: close a sheet, step back a screen, then back to Kō. False lets the app close.
     back() {
@@ -828,6 +992,7 @@
       super.componentDidMount();
       if (!day) return;
       this.persist(); // the current chunk's start, at once
+      if (typeof phone.loadLinks === 'function') phone.loadLinks();
       // Pull to refresh: a drag down from the top of the screen (not in Kō's chat, which scrolls on its own).
       const root = document.getElementById('app');
       const atTop = () => { const sc = root.querySelector('.kf-scroll'); return !sc || sc.scrollTop <= 0; };

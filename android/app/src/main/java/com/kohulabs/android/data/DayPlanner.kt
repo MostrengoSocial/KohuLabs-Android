@@ -47,6 +47,55 @@ object DayPlanner {
         return Result(changed, goals)
     }
 
+    // ---- Kō's plan for a day --------------------------------------------------------------------------------------
+
+    /** Working hours on one day, in minutes from midnight. Lunch is kept free. */
+    data class Hours(val start: Int, val end: Int, val lunch: Int? = 13 * 60, val lunchMinutes: Int = 60)
+
+    /** A task and the minutes of it still to plan. */
+    data class Need(val task: Task, val minutes: Int)
+
+    const val SHORTEST = 15  // no chunk shorter than this, unless that is all a task has left
+    const val BREAK = 5      // between chunks
+
+    /**
+     * Kō's proposal for [date]: the open tasks, in order (soonest deadline first), as chunks of [chunk] minutes in the
+     * free time of the working [hours], after [from] (minutes from midnight: now, on today), around what is already
+     * [busy] (meetings, chunks planned or done), with [BREAK] minutes between. The chunks are [Chunk.PROPOSED] and named
+     * by their slot (plan:date:HHMM), so planning the same day again updates them instead of making new ones.
+     */
+    fun propose(date: String, hours: Hours, from: Int, busy: List<Chunk>, needs: List<Need>, chunk: Int, now: Long): List<Chunk> {
+        val blocked = busy.map { minutes(it.start) to minutes(it.start) + it.minutes }.toMutableList()
+        hours.lunch?.let { blocked += it to it + hours.lunchMinutes }
+        blocked.sortBy { it.first }
+        // The free windows: working hours from now on, minus what is blocked.
+        val windows = mutableListOf<Pair<Int, Int>>()
+        var t = maxOf(hours.start, (from + 4) / 5 * 5)
+        for ((a, b) in blocked) {
+            if (a > t) windows += t to minOf(a - BREAK, hours.end)
+            t = maxOf(t, b + if (a < b) BREAK else 0)
+        }
+        if (t < hours.end) windows += t to hours.end
+        val left = needs.filter { it.minutes > 0 }.map { it.task to it.minutes }.toMutableList()
+        val out = mutableListOf<Chunk>()
+        for ((a, b) in windows.filter { it.first < it.second }) {
+            var at = a
+            while (left.isNotEmpty()) {
+                val (task, rest) = left.first()
+                val len = minOf(chunk, rest, b - at)
+                if (len < minOf(SHORTEST, rest)) break
+                out += Chunk("plan:$date:${clock(at).replace(":", "")}", task.id, task.workspaceId, date, clock(at), len, task.title, task.category,
+                    status = Chunk.PROPOSED, updatedAt = now)
+                if (rest - len > 0) left[0] = task to rest - len else left.removeAt(0)
+                at += len + BREAK
+            }
+        }
+        return out
+    }
+
+    fun minutes(hhmm: String): Int = hhmm.split(":").let { (h, m) -> h.toInt() * 60 + m.toInt() }
+    fun clock(minutes: Int): String = "%02d:%02d".format(minutes / 60, minutes % 60)
+
     /** A chunk in two: the first half at its time, the second straight after, titled (1/2) and (2/2). */
     fun halves(c: Chunk, idA: String, idB: String): List<Chunk> {
         val first = (c.minutes + 1) / 2

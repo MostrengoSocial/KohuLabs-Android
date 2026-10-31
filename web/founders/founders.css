@@ -245,3 +245,7 @@ html.kf-native .kf-screen input { -webkit-user-select: text; user-select: text; 
 /* Kō's message on the home screen: what is planned and what is waiting. Tap for Today. */
 .kf-note { position: absolute; left: 22px; right: 22px; bottom: 46px; z-index: 3; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sharp); color: var(--ink); font: 400 14px/1.45 var(--font-sans); text-align: left; text-wrap: pretty; cursor: pointer; }
 .kf-note:focus-visible, .kf-note:hover { border-color: var(--accent); outline: none; }
+
+/* Kō's plan for today (Today): accept it, plan again, or tell Kō about Revolut. */
+.kf-plan { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--accent); border-radius: var(--radius-sharp); background: var(--surface); }
+.kf-plan-ask { justify-self: start; padding: 4px 0 0; border: 0; background: none; color: var(--accent); font: 600 14px var(--font-sans); cursor: pointer; text-align: left; }

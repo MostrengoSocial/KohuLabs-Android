@@ -99,8 +99,9 @@ class SyncTest {
         assertTrue(db.dao().outbox(10).any { it.tableName == "chunks" && it.rowId == "c5" })
     }
 
-    // The phone in your hand has version 1 (no outbox): upgrading keeps everything and queues it all for the first sync.
-    // Version 1 is built from Room's own record of it (schemas/…/1.json); Room checks the result matches version 2.
+    // The phone in your hand may have version 1 (no outbox): upgrading keeps everything and queues it all for the first
+    // sync, then gives tasks their size (version 3). Version 1 is built from Room's own record of it (schemas/…/1.json);
+    // Room checks the result matches the current version.
     @Test fun upgradingFromVersion1QueuesEverythingForTheFirstSync() {
         val file = context.getDatabasePath("upgrade.db").apply { parentFile?.mkdirs(); delete() }
         val v1 = JSONObject(java.io.File("schemas/com.kohulabs.android.data.FoundersDatabase/1.json").readText()).getJSONObject("database")
@@ -118,7 +119,7 @@ class SyncTest {
             sql.execSQL("INSERT INTO settings (id, value, updated_at, deleted) VALUES ('lang', '\"pt\"', 6, 0)")
             sql.version = 1
         }
-        val db = Room.databaseBuilder(context, FoundersDatabase::class.java, "upgrade.db").addMigrations(FoundersDatabase.V1_TO_V2).allowMainThreadQueries().build().also { open += it }
+        val db = Room.databaseBuilder(context, FoundersDatabase::class.java, "upgrade.db").addMigrations(FoundersDatabase.V1_TO_V2, FoundersDatabase.V2_TO_V3).allowMainThreadQueries().build().also { open += it }
         assertEquals(listOf("chunks/c1", "settings/lang"), db.dao().outbox(10).map { "${it.tableName}/${it.rowId}" }.sorted())
         assertEquals("Inbox triage", db.dao().chunk("c1")?.title)
     }

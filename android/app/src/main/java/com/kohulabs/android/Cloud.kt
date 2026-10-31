@@ -74,6 +74,18 @@ class Cloud private constructor(context: Context) {
         }
     }
 
+    /** The Gmail accounts added to the import ({links: [...]}), on the sync thread; {links: []} when offline. */
+    fun links(done: (JSONObject) -> Unit) {
+        if (account.token() == null) return done(JSONObject().put("links", org.json.JSONArray()))
+        worker.execute { done(runCatching { api.get("/api/links") }.getOrElse { JSONObject().put("links", org.json.JSONArray()).put("error", "offline") }) }
+    }
+
+    /** Stops importing [email]; then [done] gets the accounts left. */
+    fun unlink(email: String, done: (JSONObject) -> Unit) {
+        if (account.token() == null) return links(done)
+        worker.execute { runCatching { api.post("/api/link/remove", JSONObject().put("email", email)) }; runCatching { sync.run() }; links(done) }
+    }
+
     /** Syncs once, [seconds] from now (after sign-in: by then the cloud has imported Calendar and Gmail). */
     fun syncAfter(seconds: Long, done: (Sync.Result?) -> Unit) {
         worker.schedule({ syncNow(done) }, seconds, TimeUnit.SECONDS)

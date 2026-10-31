@@ -5,7 +5,7 @@ class Statement {
   constructor(db, sql, args = []) { this.db = db; this.sql = sql; this.args = args; }
   bind(...args) { return new Statement(this.db, this.sql, args); }
   async all() { return { results: this.db.prepare(this.sql).all(...this.args), success: true }; }
-  async run() { this.db.prepare(this.sql).run(...this.args); return { success: true }; }
+  async run() { const r = this.db.prepare(this.sql).run(...this.args); return { success: true, meta: { changes: Number(r.changes) } }; }
 }
 
 export class FakeD1 {

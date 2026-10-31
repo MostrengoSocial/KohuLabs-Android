@@ -153,6 +153,7 @@ class MainActivity : ComponentActivity() {
         val data = intent?.data ?: return
         if (data.scheme != "com.kohulabs.android") return
         setIntent(Intent(intent).setData(null))
+        if (data.path == "/linked") return linked(data.getQueryParameter("email"), data.getQueryParameter("error"))
         val code = data.getQueryParameter("code")
         val verifier = cloud.account.pendingVerifier
         if (code == null || verifier == null) {
@@ -173,6 +174,22 @@ class MainActivity : ComponentActivity() {
                 signedIn(null, if (e is Api.HttpError && e.code == 403) R.string.cloud_not_invited else R.string.cloud_sign_in_failed, stay = true)
             }
         }
+    }
+
+    /**
+     * Another Gmail for the import (personal): the Worker gives a one-time link (POST /api/link/start), opened in a
+     * browser tab; Google sign-in there ends at com.kohulabs.android:/linked?email=… ([linked]).
+     */
+    fun startLink() = background.execute {
+        val url = runCatching { cloud.api.post("/api/link/start", JSONObject()).getString("url") }.getOrNull()
+        if (url == null) return@execute toPage("linked", JSONObject().put("error", "failed").toString())
+        runOnUiThread { runCatching { CustomTabsIntent.Builder().build().launchUrl(this, url.toUri()) }.onFailure { startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) } }
+    }
+
+    private fun linked(email: String?, error: String?) {
+        toPage("linked", JSONObject().put("email", email ?: JSONObject.NULL).put("error", if (email == null) error ?: "failed" else JSONObject.NULL).toString())
+        // Its mail comes in on the next import: now, then down to the phone.
+        if (email != null) cloud.refresh { res -> toPage("refreshed", res.toString()) }
     }
 
     /** Tells the screens how sign-in went: an account, or null to carry on without the cloud (or [stay] on sign-in). */
