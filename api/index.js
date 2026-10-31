@@ -22,8 +22,9 @@ const MAX_SYNC_BYTES = 4 * 1024 * 1024;
 
 const configured = (env) => !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.SESSION_SECRET && String(env.SESSION_SECRET).length >= 24);
 const allowed = (email, env) => emailList(env.FOUNDER_EMAILS).includes(email);
+// The sign-in flow cookie. Path=/ because browsers silently drop a __Host- cookie with any other path.
 const flowCookie = (url) => (url.protocol === 'https:' ? '__Host-kohulabs_android_oauth' : 'kohulabs_android_oauth');
-const clearFlow = (url) => ['Set-Cookie', cookie(flowCookie(url), '', { secure: url.protocol === 'https:', maxAge: 0, path: '/auth' })];
+const clearFlow = (url) => ['Set-Cookie', cookie(flowCookie(url), '', { secure: url.protocol === 'https:', maxAge: 0 })];
 const toApp = (query, url) => redirect(`${APP_REDIRECT}?${query}`, [clearFlow(url)]);
 
 // ---- Google sign-in, ending in the app ---------------------------------------------------------------------------
@@ -39,7 +40,7 @@ async function startGoogle(env, url) {
     client_id: c.googleId, redirect_uri: `${url.origin}/auth/google/callback`, response_type: 'code', scope: 'openid email profile',
     state, nonce, code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account',
   });
-  return redirect(`${c.authUrl}?${q}`, [['Set-Cookie', cookie(flowCookie(url), flow, { secure: url.protocol === 'https:', maxAge: OAUTH_SECONDS, path: '/auth' })]]);
+  return redirect(`${c.authUrl}?${q}`, [['Set-Cookie', cookie(flowCookie(url), flow, { secure: url.protocol === 'https:', maxAge: OAUTH_SECONDS })]]);
 }
 
 async function finishGoogle(request, env, url) {
