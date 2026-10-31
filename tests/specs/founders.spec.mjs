@@ -1,4 +1,4 @@
-// Kohu Founders (/founders/): the founder's day planner with Kō, from the Claude Design file "Ko Phone".
+// Kō (/founders/): the founder's day planner with Kō, from the Claude Design file "Ko Phone".
 import { test, expect } from './helpers.mjs';
 
 const nav = (page, i) => page.locator('nav button').nth(i);

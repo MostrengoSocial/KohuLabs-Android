@@ -1,6 +1,6 @@
 # kohulabs-android
 
-**Kohu Founders**, the Android app for the Kohu Labs founder, João Duarte: **Kō runs the day, you do the chunks.** Built from the
+**Kō**, the Android app for the Kohu Labs founder, João Duarte. **Kō runs the day, you do the chunks.** Built from the
 Claude Design project "Kohu Founders App" (file "Ko Phone"). Kō plans the day in 25 minute chunks across four tabs
 (General, Kohu with MCP tools, Personal and Revolut fed by you). Home is Kō roaming the screen until you tap him; then
 Focus, Today, Day map, the focus guard, the day review, meeting prep and follow-up, follow-ups, Kō's chat and voice,

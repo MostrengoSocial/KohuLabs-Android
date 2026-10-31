@@ -1,4 +1,4 @@
-// kohulabs-android API (Cloudflare Worker): sign-in and the cloud copy for the Kohu Founders Android app (android/).
+// kohulabs-android API (Cloudflare Worker): sign-in and the cloud copy for the Kō Android app (android/).
 //
 //   GET  /auth/google?challenge=…   Google sign-in, opened by the app in a browser tab. It ends by sending the app a
 //                                   one-time code: com.kohulabs.android:/signed-in?code=… (or ?error=…)

@@ -26,7 +26,7 @@ import org.json.JSONObject
 import java.util.concurrent.Executors
 
 /**
- * Kohu Founders: Kō runs the day, you do the chunks.
+ * Kō runs the day, you do the chunks.
  *
  * The screens are the app's web code (web/founders/, copied into the APK's assets at build time), served
  * from the APK over https://appassets.androidplatform.net so they work offline. The phone side is here:

@@ -1,4 +1,4 @@
-// Kohu Founders sync: the phone's database ↔ the cloud copy in D1 (binding DB), for index.js.
+// Kō sync: the phone's database ↔ the cloud copy in D1 (binding DB), for index.js.
 //
 //   POST /api/sync   Authorization: Bearer <app token>
 //   body  { cursor: <last seq seen, 0 at first>, changes: { <table>: [ <row>, ... ], ... } }
