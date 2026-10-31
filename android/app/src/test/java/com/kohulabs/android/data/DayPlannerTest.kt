@@ -1,6 +1,7 @@
 package com.kohulabs.android.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DayPlannerTest {
@@ -47,5 +48,31 @@ class DayPlannerTest {
     @Test fun halvesRoundTheFirstHalfUp() {
         assertEquals(listOf(8, 7), DayPlanner.halves(chunk("c8", minutes = 15), "a", "b").map { it.minutes })
         assertEquals("23:59", DayPlanner.addMinutes("23:50", 30))
+    }
+
+    // ---- Kō's plan ----
+
+    private fun task(id: String, due: String? = null, ws: String = "kohu") = Task(id, ws, "Task $id", "task", dueDate = due, createdAt = 0, updatedAt = 0)
+    private val workday = DayPlanner.Hours(9 * 60, 18 * 60)
+
+    @Test fun theProposalFillsWorkingHoursAroundMeetingsAndLunch() {
+        val meeting = chunk("cal:e1", date = "2026-11-02", start = "10:00", minutes = 60).copy(category = DayPlanner.MEETING)
+        val p = DayPlanner.propose("2026-11-02", workday, from = 0, busy = listOf(meeting),
+            needs = listOf(DayPlanner.Need(task("a"), 60), DayPlanner.Need(task("b", ws = "revolut"), 25), DayPlanner.Need(task("c"), 0)), chunk = 25, now = 7)
+        // 09:00 to 09:55 (a break before the meeting), then from 11:05; a's last 10 minutes get a chunk of their own.
+        assertEquals(listOf("09:00" to 25, "09:30" to 25, "11:05" to 10, "11:20" to 25), p.map { it.start to it.minutes })
+        assertEquals(listOf("a", "a", "a", "b"), p.map { it.taskId })
+        assertEquals("plan:2026-11-02:0900", p[0].id)
+        assertEquals(Chunk.PROPOSED to "revolut", p[3].status to p[3].workspaceId)
+        assertEquals("Task b", p[3].title)
+    }
+
+    @Test fun theProposalStartsFromNowAndKeepsLunchAndTheEndOfTheDayFree() {
+        val many = listOf(DayPlanner.Need(task("a"), 600))
+        val p = DayPlanner.propose("2026-11-02", workday, from = 11 * 60 + 52, busy = emptyList(), needs = many, chunk = 45, now = 7)
+        assertEquals("11:55", p.first().start)
+        assertTrue(p.none { DayPlanner.minutes(it.start) in 12 * 60 + 56 until 14 * 60 })
+        assertTrue(p.all { DayPlanner.minutes(it.start) + it.minutes <= 18 * 60 })
+        assertEquals(emptyList<Chunk>(), DayPlanner.propose("2026-11-02", workday, 17 * 60 + 50, emptyList(), many, 25, 7))
     }
 }

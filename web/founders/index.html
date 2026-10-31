@@ -176,6 +176,18 @@
           <sc-if value="{{ showSynced }}">
             <button onClick="{{ openTools }}" class="k-mono" style="margin-top:-8px;justify-self:start;background:none;border:0;padding:0;color:var(--muted);font-size:10px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;line-height:1.5"><i style="flex:none;width:6px;height:6px;border-radius:50%;background:var(--accent)"></i>{{ syncedText }}</button>
           </sc-if>
+          <sc-if value="{{ planShow }}">
+            <div class="kf-plan">
+              <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted)"><i style="flex:none;width:7px;height:7px;border-radius:50%;background:var(--accent)"></i>{{ planEyebrow }}</span>
+              <b style="font-size:22px;letter-spacing:-0.02em;line-height:1.1">{{ planTitle }}</b>
+              <span style="font-size:14px;color:var(--muted);line-height:1.45;text-wrap:pretty">{{ planBody }}</span>
+              <div style="display:flex;gap:8px">
+                <sc-if value="{{ planCanAccept }}"><button class="k-btn k-btn-primary k-btn-sm" onClick="{{ planAccept }}" style="flex:1;justify-content:center">{{ planAcceptLabel }}</button></sc-if>
+                <button class="k-btn k-btn-ghost k-btn-sm" onClick="{{ planAgain }}" style="flex:1;justify-content:center">{{ planAgainLabel }}</button>
+              </div>
+              <button class="kf-plan-ask" onClick="{{ planRevolut }}">{{ planRevolutText }}</button>
+            </div>
+          </sc-if>
           <sc-if value="{{ canFeed }}">
             <div style="display:grid;gap:10px;grid-template-columns:minmax(0,1fr);padding:14px;border:1px solid var(--line);border-radius:var(--radius-sharp);background:var(--surface)">
               <span class="k-mono" style="display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap"><i style="flex:none;width:7px;height:7px;border-radius:50%;background:var(--acid)"></i>{{ t.feedLabel }}</span>
@@ -695,6 +707,7 @@
           <div>
             <div class="k-mono" style="color:var(--accent);margin-bottom:6px">01 <span style="color:var(--muted)">· {{ t.sAccount }}</span></div>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">Google Workspace</span><span class="k-pill k-pill-live"><i></i>{{ t.connected }}</span></div>
+            <sc-if value="{{ showLinks }}"><sc-for list="{{ linkRows }}" as="r"><div class="kf-link" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="display:grid;gap:4px;min-width:0"><span style="font-weight:600;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ r.note }}</span></span><button class="k-chip" onClick="{{ r.onClick }}" style="white-space:nowrap">{{ r.action }}</button></div></sc-for></sc-if>
             <sc-for list="{{ scopeRows }}" as="r"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ r.name }}</span><span class="k-mono" style="color:var(--muted);font-size:10px">{{ r.value }}</span></div></sc-for>
             <sc-if value="{{ demo }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><span style="font-weight:600">{{ t.revokeAll }}</span><button class="k-chip" onClick="{{ signOut }}" style="white-space:nowrap">{{ t.revoke }}</button></div></sc-if>
           </div>

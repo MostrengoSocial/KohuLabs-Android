@@ -47,8 +47,19 @@ Or open `android/` in Android Studio. CI builds the same debug APK on every pull
 
 ### Day to day
 
-- **Kō's home** shows a short message under Kō: what's left today, the next meeting, the emails waiting on you, and
-  whether Google could be reached. Tap it for Today.
+- **Kō's home** shows a short message under Kō: whether today is planned, what's left, the next meeting, the emails
+  waiting on you, and whether Google could be reached. Tap it for Today.
+- **Kō plans each workday** (`DayPlanner.propose`, run by `FoundersStore` when the day is first read): your open tasks,
+  soonest deadline first, as chunks (your chunk size, 25 minutes by default) in your working hours, around meetings and
+  lunch, with 5-minute breaks. It's a proposal: Today shows it with **Accept** and **Plan again**, and asks "Anything for
+  Revolut today?". Until you accept, the proposal follows what comes in (new meetings, new tasks); once accepted it stays
+  put, and "plan again" re-plans what's left of the day.
+- **Tasks** have a size and a deadline, read from how you say them: "proposal for Ana 2h by Friday",
+  "#pessoal IRS até sexta", "revolut: onboarding review 45 min" (Revolut work goes to the Revolut tab). A task without
+  a size is one chunk. Typed in the task box, said to Kō, or said into the mic.
+- **Working hours:** weekdays 09:00 to 18:00, lunch 13:00 to 14:00 (setting `hours`). Tell Kō about a single day:
+  "today I work until 20:00", "tomorrow I start at 11", "Friday off", "hoje trabalho até às 20" (setting
+  `hours:YYYY-MM-DD`). Weekends are off unless you say otherwise.
 - **Pull down to refresh** (anywhere but Kō's chat): the cloud imports Calendar and Gmail on the spot
   (`POST /api/refresh`, at most once a minute), then the app syncs; Kō thinks while it checks.
 - **Voice:** the mic buttons (task box, Kō's chat) use the phone's own speech-to-text, so you can tell Kō a task out
@@ -129,8 +140,13 @@ day within seconds. "Today" is counted in `TIMEZONE` (Europe/Lisbon).
   out-of-office ones, become a "Meeting" chunk at their real time in the Kohu workspace, plus a meeting with its
   attendees and Meet link. Moved or cancelled events update; what you did on the phone (done, skipped) is kept.
   Meetings never roll over to the next day.
-- **Gmail** (`gmail.metadata`: sender and subject only, never bodies): unread threads in the inbox's Primary category
-  become "waiting on you" follow-ups; once read, they are done.
+- **Gmail** (`gmail.metadata`: sender and subject only, never bodies): unread threads in the inbox's Primary category,
+  from people, become "waiting on you" follow-ups; once read, they are done. Newsletters and lists, no-reply and other
+  automated senders, auto-replies, and mail from your own addresses are left out. The signed-in account
+  (hello@kohulabs.com, new clients) goes to Kohu.
+- **Your personal Gmail** (You › Settings › Personal Gmail › Connect): a second Google sign-in, for Gmail metadata only,
+  kept in D1 (`google_links`, encrypted like the other). Its mail from people goes to Personal and opens in that account.
+  Remove stops the import and removes its follow-ups.
 - **A nudge each morning:** "Today: 4 meetings, 6 emails waiting", in the app's language.
 - **The sample day** is cleared on the phone the first time a real day arrives (`FoundersStore`).
 
@@ -142,6 +158,11 @@ and waits for a new sign-in. Setting it up, once:
 2. Google Auth Platform → Data Access → Add or remove scopes: add `.../auth/calendar.readonly` and
    `.../auth/gmail.metadata`. With the app set to Internal (your Workspace only), no Google verification is needed.
 3. In the app: You › Sign out, then sign in again, and allow Calendar and Gmail.
+4. For a personal Gmail (a gmail.com account): Google Auth Platform → Audience → User type **External**, then
+   **Publish app** (In production). An Internal app only accepts your Workspace's accounts; in Testing, Google
+   expires the access after 7 days. Unverified, Google shows a warning on the sign-in ("Google hasn't verified this
+   app": Advanced › Go to …), which is fine for your own use. Who can use the app is still decided by
+   `FOUNDER_EMAILS` here and by the portal's own lists.
 
 ## Tests
 
@@ -156,5 +177,5 @@ CI (`.github/workflows/ci.yml`) runs on every pull request and every push to mai
 
 ## Still simulated
 
-As in the design: OpenRouter sign-in, Kō's replies, the wake word, the MCP servers, the Spend figures, the meeting
-screen (prep and follow-up), and the Stats week.
+Hidden in the app until built: Kō's AI (OpenRouter or a model on your computer over Tailscale, capped at $20 a month),
+the wake word, the focus guard, the MCP servers, the Spend figures and the meeting screen (prep and follow-up).

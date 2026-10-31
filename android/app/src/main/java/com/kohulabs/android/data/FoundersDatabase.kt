@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * when it changes, raise the version, add a Room migration here and the matching file in db/migrations/.
  */
 @Database(
-    version = 2,
+    version = 3,
     exportSchema = true,
     entities = [
         Workspace::class, Task::class, Chunk::class, Goal::class, Nudge::class, FollowUp::class, Alarm::class,
@@ -27,8 +27,15 @@ abstract class FoundersDatabase : RoomDatabase() {
 
         fun get(context: Context): FoundersDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, FoundersDatabase::class.java, "founders.db")
-                .addMigrations(V1_TO_V2)
+                .addMigrations(V1_TO_V2, V2_TO_V3)
                 .build().also { instance = it }
+        }
+
+        /** 3: tasks have a size (estimate, in minutes), for Kō's plan. */
+        val V2_TO_V3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN estimate INTEGER")
+            }
         }
 
         /** 2: the outbox, for syncing. Everything already on the phone is queued, so the first sync uploads it. */

@@ -158,21 +158,29 @@ function fakeGoogle(state) {
       const p = new URLSearchParams(init.body);
       if (p.get('grant_type') === 'refresh_token') {
         if (state.revoked) return new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 });
-        state.refreshedWith = p.get('refresh_token');
-        return new Response(JSON.stringify({ access_token: 'at-1', scope: state.scope }), { status: 200 });
+        // The personal Gmail (a linked account) has its own refresh token, access token and mailbox.
+        const personal = p.get('refresh_token') === 'rt-personal';
+        if (!personal) state.refreshedWith = p.get('refresh_token');
+        return new Response(JSON.stringify({ access_token: personal ? 'at-2' : 'at-1', scope: personal ? MAIL_SCOPE : state.scope }), { status: 200 });
       }
-      return new Response(JSON.stringify({ id_token: idToken({ iss: 'https://accounts.google.com', aud: ENV.GOOGLE_CLIENT_ID, nonce: state.nonce, exp: now() + 600, email: 'hello@kohulabs.com', email_verified: true, name: 'João Duarte' }), refresh_token: 'rt-secret', scope: state.scope }), { status: 200 });
+      const link = state.linking;
+      return new Response(JSON.stringify({ id_token: idToken({ iss: 'https://accounts.google.com', aud: ENV.GOOGLE_CLIENT_ID, nonce: state.nonce, exp: now() + 600, email: link ? link.email : 'hello@kohulabs.com', email_verified: true, name: 'João Duarte' }),
+        refresh_token: link ? 'rt-personal' : 'rt-secret', scope: link ? link.scope : state.scope }), { status: 200 });
     }
-    assert.equal(init.headers && init.headers.Authorization, 'Bearer at-1');
+    const auth = init.headers && init.headers.Authorization;
+    assert.match(auth, /^Bearer at-[12]$/);
+    const box = auth === 'Bearer at-2' ? state.personal : state.mail;
     if (u.hostname === 'www.googleapis.com') return new Response(JSON.stringify({ items: state.events }), { status: state.calStatus || 200 });
     if (u.pathname.endsWith('/messages')) {
       assert.deepEqual(u.searchParams.getAll('labelIds'), ['INBOX', 'UNREAD']);
       assert.equal(u.searchParams.get('q'), null, 'gmail.metadata cannot search');
-      return new Response(JSON.stringify({ messages: state.mail.map((m) => ({ id: m.id })) }), { status: 200 });
+      return new Response(JSON.stringify({ messages: box.map((m) => ({ id: m.id })) }), { status: 200 });
     }
-    const m = state.mail.find((x) => u.pathname.endsWith('/' + x.id));
+    const m = box.find((x) => u.pathname.endsWith('/' + x.id));
     assert.equal(u.searchParams.get('format'), 'metadata');
-    return new Response(JSON.stringify({ id: m.id, threadId: m.thread, internalDate: String(NOW - 86400e3), labelIds: m.labels || ['INBOX', 'UNREAD'], payload: { headers: [{ name: 'From', value: m.from }, { name: 'Subject', value: m.subject }] } }), { status: 200 });
+    assert.deepEqual(u.searchParams.getAll('metadataHeaders'), ['From', 'Subject', 'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted']);
+    const headers = [{ name: 'From', value: m.from }, { name: 'Subject', value: m.subject }, ...Object.entries(m.headers || {}).map(([name, value]) => ({ name, value }))];
+    return new Response(JSON.stringify({ id: m.id, threadId: m.thread, internalDate: String(NOW - 86400e3), labelIds: m.labels || ['INBOX', 'UNREAD'], payload: { headers } }), { status: 200 });
   };
 }
 const event = (id, startIso, endIso, over = {}) => ({ id, status: 'confirmed', summary: `Meeting ${id}`, start: { dateTime: startIso }, end: { dateTime: endIso }, attendees: [{ email: 'ana@x.pt', displayName: 'Ana' }, { email: 'hello@kohulabs.com', self: true, responseStatus: 'accepted' }], hangoutLink: 'https://meet.google.com/abc', ...over });
@@ -287,4 +295,71 @@ test('refresh: imports now for the signed-in person, at most once a minute; need
   assert.deepEqual(await (await post('/api/refresh', {}, { token, env })).json(), { ok: true, skipped: true });
   env.DB.db.prepare('DELETE FROM google_accounts').run();
   assert.deepEqual(await (await post('/api/refresh', {}, { token, env })).json(), { ok: false, error: 'no_google' });
+});
+
+test('import: only mail from people (no newsletters, no-reply, auto-replies or your own); a linked personal Gmail comes in as Personal', async () => {
+  const state = { scope: `${CAL_SCOPE} ${MAIL_SCOPE}`, events: [], personal: [],
+    mail: [{ id: 'm1', thread: 't1', from: 'Marta Lopes <marta@bakery.pt>', subject: 'Website for our bakery?' },
+      { id: 'm2', thread: 't2', from: 'Stripe <news@stripe.com>', subject: 'What’s new', headers: { 'List-Unsubscribe': '<mailto:u@stripe.com>' } },
+      { id: 'm3', thread: 't3', from: 'GitHub <noreply@github.com>', subject: 'PR merged' },
+      { id: 'm4', thread: 't4', from: 'Rui <rui@x.pt>', subject: 'Out of office', headers: { 'Auto-Submitted': 'auto-replied' } },
+      { id: 'm5', thread: 't5', from: 'Kohu Labs <hello@kohulabs.com>', subject: 'Note to self' },
+      { id: 'm6', thread: 't6', from: 'Ana <ana@vc.pt>', subject: 'Intro', headers: { 'Auto-Submitted': 'no', Precedence: 'first-class' } }] };
+  const { env, token } = await connected(state);
+  assert.equal((await importFor(env, 'hello@kohulabs.com', { now: NOW })).emails, 2);
+  assert.deepEqual(rows(env, 'SELECT id, workspace_id, source FROM follow_ups ORDER BY id').map((f) => [f.id, f.workspace_id, f.source]), [['gm:t1', 'kohu', 'Gmail'], ['gm:t6', 'kohu', 'Gmail']]);
+
+  // Adding the personal Gmail: a ticket from the app, a browser tab to Google (Gmail metadata only), back to the app.
+  assert.equal((await post('/api/link/start', {}, { env })).status, 401);
+  const { url } = await (await post('/api/link/start', {}, { token, env })).json();
+  assert.match(url, /^https:\/\/android\.kohulabs\.com\/auth\/google\/link\?ticket=/);
+  const start = await call(new URL(url).pathname + new URL(url).search, { env });
+  const auth = new URL(start.headers.get('Location'));
+  assert.deepEqual(auth.searchParams.get('scope').split(' '), ['openid', 'email', MAIL_SCOPE]);
+  assert.equal(auth.searchParams.get('access_type'), 'offline');
+  state.nonce = auth.searchParams.get('nonce');
+  state.linking = { email: 'jhenriquejduarte@gmail.com', scope: `openid ${MAIL_SCOPE}` };
+  const back = await call(`/auth/google/callback?code=abc&state=${auth.searchParams.get('state')}`, { cookie: cookieHeader(start), env });
+  assert.equal(back.headers.get('Location'), 'com.kohulabs.android:/linked?email=jhenriquejduarte%40gmail.com');
+  assert.deepEqual((await (await call('/api/links', { headers: { Authorization: `Bearer ${token}` }, env })).json()).links, [{ email: 'jhenriquejduarte@gmail.com', lastImportAt: null, lastError: null }]);
+  const [link] = rows(env, 'SELECT * FROM google_links');
+  assert.ok(!link.refresh_token.includes('rt-personal'), 'stored encrypted');
+  // The app's own account is unchanged, and the next sync imports straight away.
+  assert.equal(rows(env, 'SELECT refresh_token FROM google_accounts')[0].refresh_token.length > 0, true);
+  assert.equal(rows(env, 'SELECT last_import_at FROM google_accounts')[0].last_import_at, null);
+
+  // Personal mail from people goes to Personal; mail between your own two accounts is left out.
+  state.personal = [{ id: 'p1', thread: 'pt1', from: 'Mãe <mae@sapo.pt>', subject: 'Jantar domingo' },
+    { id: 'p2', thread: 'pt2', from: 'hello@kohulabs.com', subject: 'Fwd: invoice' },
+    { id: 'p3', thread: 'pt3', from: 'Continente <no-reply@continente.pt>', subject: 'Cartão' }];
+  state.linking = null;
+  const res = await importFor(env, 'hello@kohulabs.com', { now: NOW + 3600e3 });
+  assert.equal(res.emails, 3);
+  const personal = rows(env, "SELECT id, workspace_id, person, source FROM follow_ups WHERE id LIKE 'gl:%'");
+  assert.equal(personal.length, 1);
+  assert.match(personal[0].id, /^gl:[0-9a-f]{8}:pt1$/);
+  assert.deepEqual([personal[0].workspace_id, personal[0].person, personal[0].source], ['personal', 'Mãe', 'jhenriquejduarte@gmail.com']);
+  assert.ok(rows(env, 'SELECT last_import_at FROM google_links')[0].last_import_at > 0);
+  // Read on the phone's Gmail: done. Mail sent from the personal account to hello@ is not a client either.
+  state.personal = [];
+  await importFor(env, 'hello@kohulabs.com', { now: NOW + 2 * 3600e3 });
+  assert.equal(rows(env, "SELECT status FROM follow_ups WHERE id LIKE 'gl:%'")[0].status, 'done');
+
+  // Linking the same account the app signed in with, or without allowing Gmail, is refused.
+  for (const [linking, error] of [[{ email: 'hello@kohulabs.com', scope: MAIL_SCOPE }, 'same_account'], [{ email: 'x@gmail.com', scope: 'openid' }, 'no_gmail']]) {
+    const { url: u2 } = await (await post('/api/link/start', {}, { token, env })).json();
+    const s2 = await call(new URL(u2).pathname + new URL(u2).search, { env });
+    const a2 = new URL(s2.headers.get('Location'));
+    state.nonce = a2.searchParams.get('nonce'); state.linking = linking;
+    const b2 = await call(`/auth/google/callback?code=abc&state=${a2.searchParams.get('state')}`, { cookie: cookieHeader(s2), env });
+    assert.equal(b2.headers.get('Location'), `com.kohulabs.android:/linked?error=${error}`);
+  }
+  assert.equal((await call('/auth/google/link?ticket=forged', { env })).headers.get('Location'), 'com.kohulabs.android:/linked?error=failed');
+
+  // Removing it: no more imports from it, and its follow-ups are gone from every phone.
+  assert.equal((await post('/api/link/remove', { email: 'nobody@gmail.com' }, { token, env })).status, 404);
+  assert.deepEqual(await (await post('/api/link/remove', { email: 'jhenriquejduarte@gmail.com' }, { token, env })).json(), { ok: true });
+  assert.equal(rows(env, 'SELECT COUNT(*) AS n FROM google_links')[0].n, 0);
+  const pulled = await (await post('/api/sync', { cursor: 0, changes: {} }, { token, env })).json();
+  assert.equal(pulled.changes.follow_ups.find((f) => f.id.startsWith('gl:')).deleted, 1);
 });

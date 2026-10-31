@@ -20,6 +20,17 @@ interface FoundersDao {
     @Query("SELECT * FROM chunks WHERE id = :id")
     fun chunk(id: String): Chunk?
 
+    /** Open tasks Kō can plan: yours, not meetings from Calendar. Soonest deadline first, then oldest. */
+    @Query("SELECT * FROM tasks WHERE deleted = 0 AND status = 'open' AND category <> 'meet' ORDER BY due_date IS NULL, due_date, created_at, id")
+    fun openTasks(): List<Task>
+
+    /** Every chunk of the open tasks (to know how much of each is done or planned). */
+    @Query("SELECT c.* FROM chunks c JOIN tasks t ON t.id = c.task_id WHERE c.deleted = 0 AND t.deleted = 0 AND t.status = 'open'")
+    fun chunksOfOpenTasks(): List<Chunk>
+
+    @Query("SELECT * FROM chunks WHERE deleted = 0 AND date = :date AND status = 'proposed'")
+    fun proposedOn(date: String): List<Chunk>
+
     @Query("SELECT * FROM goals WHERE deleted = 0 AND date = :date ORDER BY rowid")
     fun goalsOn(date: String): List<Goal>
 

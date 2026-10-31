@@ -33,6 +33,8 @@ data class Task(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(defaultValue = "0") val deleted: Boolean = false,
+    /** Minutes of work Kō plans for it (null: one chunk). */
+    val estimate: Int? = null,
 )
 
 @Entity(tableName = "chunks", indices = [Index(value = ["date"], name = "chunks_by_date")])
@@ -53,6 +55,7 @@ data class Chunk(
 ) {
     companion object {
         const val PLANNED = "planned"
+        const val PROPOSED = "proposed" // in Kō's plan for the day, not accepted yet
         const val DONE = "done"
         const val SKIPPED = "skipped"
         const val SPLIT = "split"     // replaced by its two halves
