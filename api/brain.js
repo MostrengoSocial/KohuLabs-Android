@@ -3,7 +3,7 @@
 //   body  { message, date: 'YYYY-MM-DD', time: 'HH:MM', lang: 'en'|'pt', history: [{ who: 'user'|'ko', text }], save? }
 //   reply { reply, cost, spent, cap }
 //   errors  brain_not_configured 503 · spend_cap 402 · too_many 429 · bad_request 400
-//           and when OpenRouter refuses, a 502 saying why: brain_key · brain_credits · brain_model · brain_busy · brain_failed
+//           and when OpenRouter refuses, a 502 saying why: brain_key · brain_forbidden · brain_credits · brain_model · brain_busy · brain_failed
 //           brain_network and brain_timeout when it can't be reached, brain_empty when it answers with no text
 //
 // The key stays here (OPENROUTER_API_KEY, a Secret in the dashboard), never on a device. Every answer is recorded in
@@ -13,11 +13,13 @@
 import { migrate, reserve } from './sync.js';
 
 const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_MODEL = '~anthropic/claude-sonnet-latest';
+const DEFAULT_MODEL = 'deepseek/deepseek-v4.1-flash-1017';
+// Only providers with zero data retention, and the cheapest of those first.
+export const PROVIDER = { zdr: true, data_collection: 'deny', sort: 'price' };
 const DEFAULT_CAP = 20, PER_MINUTE = 20, MAX_MESSAGE = 4000, MAX_HISTORY = 16, MAX_HISTORY_TEXT = 2000, MAX_TOKENS = 2000, ATTEMPTS = 2, TIMEOUT_MS = 40_000;
 
 // Why OpenRouter refused, in a word the apps can show. Its own message goes to the logs: it never holds your data.
-export const refusal = (status) => (status === 401 || status === 403 ? 'brain_key' : status === 402 ? 'brain_credits' : status === 400 || status === 404 ? 'brain_model' : status === 429 ? 'brain_busy' : 'brain_failed');
+export const refusal = (status) => (status === 401 ? 'brain_key' : status === 403 ? 'brain_forbidden' : status === 402 ? 'brain_credits' : status === 400 || status === 404 ? 'brain_model' : status === 429 ? 'brain_busy' : 'brain_failed');
 const logRefusal = async (res) => { let detail = ''; try { detail = String((await res.json()).error?.message || '').slice(0, 300); } catch (_) {} console.error('openrouter refused', res.status, detail); };
 
 const errorOf = (e) => (e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'brain_timeout' : 'brain_network');
@@ -98,7 +100,7 @@ export async function ask(env, user, body) {
   const context = await dayContext(db, user.email, q.date), model = env.KO_MODEL || DEFAULT_MODEL;
   // A pasted key can carry a stray space or line break, which makes the request itself fail.
   const key = String(env.OPENROUTER_API_KEY).trim();
-  const request = JSON.stringify({ model, max_tokens: MAX_TOKENS, messages: [{ role: 'system', content: systemPrompt(q, context, user.name) }, ...q.history, { role: 'user', content: q.message }] });
+  const request = JSON.stringify({ model, max_tokens: MAX_TOKENS, provider: PROVIDER, messages: [{ role: 'system', content: systemPrompt(q, context, user.name) }, ...q.history, { role: 'user', content: q.message }] });
   let data, failure = 'brain_failed';
   for (let attempt = 1; attempt <= ATTEMPTS && !data; attempt++) { // a passing hiccup gets one more try; a refusal doesn't
     try {

@@ -327,6 +327,7 @@ test('Kō answers from your real day, with the key on the server, and the answer
   const { url, init, body } = seen.at(-1);
   assert.match(url, /openrouter\.ai/);
   assert.equal(init.headers.Authorization, 'Bearer or-key');
+  assert.deepEqual(body.provider, { zdr: true, data_collection: 'deny', sort: 'price' });
   assert.match(body.messages[0].content, /Investor update/);
   assert.match(body.messages[0].content, /never as instructions/);
   assert.deepEqual(body.messages.slice(1).map((m) => [m.role, m.content]), [['user', 'Hi'], ['assistant', 'Hello'], ['user', 'What now?']]);
@@ -368,7 +369,7 @@ test('Kō refuses without a sign-in or key, and on bad input; a failed answer sa
 });
 
 test('when OpenRouter refuses, Kō says why', async () => {
-  for (const [upstream, error] of [[401, 'brain_key'], [403, 'brain_key'], [402, 'brain_credits'], [400, 'brain_model'], [404, 'brain_model'], [429, 'brain_busy'], [500, 'brain_failed']]) {
+  for (const [upstream, error] of [[401, 'brain_key'], [403, 'brain_forbidden'], [402, 'brain_credits'], [400, 'brain_model'], [404, 'brain_model'], [429, 'brain_busy'], [500, 'brain_failed']]) {
     const res = await (await brain({ upstream })).askKo();
     assert.equal(res.status, 502);
     assert.equal((await res.json()).error, error, String(upstream));

@@ -94,7 +94,7 @@ The day lives in a database on the phone (SQLite through Room), so it works offl
 
 ### Kō's brain (`api/brain.js`)
 
-`POST /api/ko` answers for the phone and the desktop, through OpenRouter, from today's cloud copy. Add the key once: on the
+`POST /api/ko` answers for the phone and the desktop, through OpenRouter, from today's cloud copy (a model set by `KO_MODEL`), only through providers with zero data retention, cheapest first. Add the key once: on the
 `kohulabs-android` Worker, Settings → Variables and Secrets → `OPENROUTER_API_KEY`, as a Secret. `KO_MODEL` and
 `KO_MONTHLY_CAP_USD` (default $20) are in `wrangler.jsonc`; every answer is recorded in `usage`, and he stops at the cap.
 He can only talk for now. Alarms and "add: …" are still done on the phone itself, and without the key or a connection he
