@@ -20,19 +20,20 @@ const roamer = createRoamer({ width: area.w / area.scale, height: area.h / area.
   x: Math.max(0, area.w / area.scale - WIN.w - 40), y: Math.max(0, area.h / area.scale - WIN.h - 10) });
 if (reducedMotion) roamer.hold(true);
 
-const flags = { hover: false, drag: false, idle: false, paused: false, hidden: false, typing: false };
-const applyHold = () => { if (!reducedMotion) roamer.hold(flags.hover || flags.drag || flags.idle || flags.paused || flags.typing); };
+const flags = { hover: false, drag: false, idle: false, paused: false, hidden: false, typing: false, thinking: false };
+const applyHold = () => { if (!reducedMotion) roamer.hold(flags.hover || flags.drag || flags.idle || flags.paused || flags.typing || flags.thinking); };
 
 // ---- what he looks like ------------------------------------------------------------------------------------------
 let shown = '', noticed = 'nothing';
 function look() {
   const called = !!current;
-  const want = called ? 'called' : flags.idle ? 'sleeping' : flags.hover ? 'hover' : flags.typing ? 'typing' : noticed === 'window' ? 'glance' : noticed === 'mouse-near' ? 'near' : roamer.held ? 'still' : roamer.behaviour;
+  const want = called ? 'called' : flags.idle ? 'sleeping' : flags.thinking ? 'thinking' : flags.hover ? 'hover' : flags.typing ? 'typing' : noticed === 'window' ? 'glance' : noticed === 'mouse-near' ? 'near' : roamer.held ? 'still' : roamer.behaviour;
   if (want === shown) return;
   shown = want;
   if (want === 'called') { signal.setMood('surprised', { duration: 1.2 }); signal.setState('speaking'); signal.flash(); }
   else if (want === 'sleeping') { signal.setMood('sleepy'); signal.setState('idle'); }
   else if (want === 'hover') { signal.setMood('curious'); signal.setState('listening'); }
+  else if (want === 'thinking') { signal.setMood('neutral'); signal.setState('thinking'); }
   else if (want === 'typing') { signal.setMood('curious'); signal.setState('listening'); }
   else if (want === 'glance' || want === 'near') { signal.setMood('curious'); signal.setState('idle'); }
   else if (want === 'still') { signal.setMood('neutral'); signal.setState('idle'); }
@@ -180,6 +181,10 @@ listen('ko-hover', (hover) => { flags.hover = hover; applyHold(); });
 listen('ko-idle', (idle) => {
   flags.idle = idle; applyHold(); shown = ''; setRendering();
   if (!idle) { signal.setMood('surprised', { duration: 1 }); signal.pulse(); } // you're back!
+});
+listen('ko-thinking', (on) => {
+  flags.thinking = on; applyHold(); shown = '';
+  if (!on) { signal.flash(); signal.setMood('happy', { duration: 1.5 }); }
 });
 listen('ko-mouse', (p) => attn.mouseMoved(p.x, p.y, performance.now()));
 listen('ko-key', (p) => attn.keyPressed(p, performance.now()));

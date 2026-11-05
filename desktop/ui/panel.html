@@ -6,7 +6,11 @@
   <link rel="stylesheet" href="panel.css">
 </head>
 <body>
-  <main id="app" aria-live="polite"></main>
+  <main id="app"></main>
+  <form id="chat" hidden>
+    <input id="ask" type="text" autocomplete="off" maxlength="4000">
+    <button id="send" type="submit"></button>
+  </form>
   <script type="module" src="panel.js"></script>
 </body>
 </html>

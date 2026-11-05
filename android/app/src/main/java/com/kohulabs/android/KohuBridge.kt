@@ -49,6 +49,10 @@ class KohuBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun refresh() = cloud.refresh { res -> activity.toPage("refreshed", res.toString()) }
 
+    /** Asks Kō's brain; the page hears back in kohuFounders.koAnswered({reply | error}). */
+    @JavascriptInterface
+    fun ask(question: String) = cloud.ask(JSONObject(question)) { res -> activity.toPage("koAnswered", res.toString()) }
+
     /** Whether the phone can turn speech into text (Google's speech recognition, or another app that offers it). */
     @JavascriptInterface
     fun canListen(): Boolean = activity.canListen()

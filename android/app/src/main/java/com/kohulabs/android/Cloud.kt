@@ -74,6 +74,26 @@ class Cloud private constructor(context: Context) {
         }
     }
 
+    /**
+     * Asks Kō's brain (POST /api/ko). The phone's latest changes go up first, so he answers from the day as it is now.
+     * [done] gets {reply, ...} or {error}, on the sync thread.
+     */
+    fun ask(question: JSONObject, done: (JSONObject) -> Unit) {
+        if (account.token() == null) return done(JSONObject().put("error", "signed_out"))
+        worker.execute {
+            runCatching { sync.run() }
+            done(try {
+                api.post("/api/ko", question)
+            } catch (e: Api.HttpError) {
+                if (e.code == 401) account.clear()
+                JSONObject().put("error", e.message)
+            } catch (e: Exception) {
+                Log.w(TAG, "Kō could not be reached", e)
+                JSONObject().put("error", "offline")
+            })
+        }
+    }
+
     /** Syncs once, [seconds] from now (after sign-in: by then the cloud has imported Calendar and Gmail). */
     fun syncAfter(seconds: Long, done: (Sync.Result?) -> Unit) {
         worker.schedule({ syncNow(done) }, seconds, TimeUnit.SECONDS)
@@ -112,7 +132,7 @@ class Api(private val base: String, private val token: () -> String?) {
         try {
             c.requestMethod = method
             c.connectTimeout = 15_000
-            c.readTimeout = 30_000
+            c.readTimeout = 60_000 // Kō's brain can take a while
             c.setRequestProperty("Accept", "application/json")
             token()?.let { c.setRequestProperty("Authorization", "Bearer $it") }
             if (body != null) {

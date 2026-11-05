@@ -17,11 +17,20 @@ function demoTables() {
   };
 }
 
+const demoChat = {};
+const demoDay = () => ({ tables: { ...demoTables(), messages: demoChat }, syncedAt: Date.now() });
 const demo = {
   ko_area: () => ({ x: 0, y: 0, w: innerWidth, h: innerHeight, scale: 1 }),
-  get_day: () => ({ tables: demoTables(), syncedAt: Date.now() }),
-  sync_day: () => ({ tables: demoTables(), syncedAt: Date.now() }),
-  refresh_day: () => ({ tables: demoTables(), syncedAt: Date.now() }),
+  get_day: demoDay,
+  sync_day: demoDay,
+  refresh_day: demoDay,
+  ask_ko: ({ question: q }) => new Promise((resolve, reject) => setTimeout(() => {
+    if (/fail/.test(q.message)) return reject('brain_not_configured');
+    const n = Object.keys(demoChat).length, reply = 'You’re on the investor update outline, then the client check-in at the top of the hour.';
+    demoChat['u' + n] = { id: 'u' + n, who: 'user', text: q.message, date: q.date, created_at: n + 1 };
+    demoChat['k' + n] = { id: 'k' + n, who: 'ko', text: reply, date: q.date, created_at: n + 2 };
+    resolve({ reply });
+  }, 600)),
   get_account: () => ({ email: 'you@example.com', name: 'You' }),
 };
 

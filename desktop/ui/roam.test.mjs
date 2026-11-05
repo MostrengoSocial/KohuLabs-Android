@@ -68,3 +68,10 @@ test('a clock that runs backwards or stands still never breaks him', () => {
   for (const dt of [-0.01, 0, NaN]) r.step(dt);
   assert.ok(Number.isFinite(r.x) && Number.isFinite(r.y));
 });
+
+test('roaming never makes his glyphs race: that is for really thinking or speaking', () => {
+  for (const [name, [mood, state]] of Object.entries(BEHAVIOURS)) {
+    assert.ok(state === 'idle' || state === 'listening', `${name} is ${state}`);
+    assert.notEqual(mood, 'surprised', name);
+  }
+});

@@ -54,7 +54,7 @@ Or open `android/` in Android Studio. CI builds the same debug APK on every pull
   (`POST /api/refresh`, at most once a minute), then the app syncs; Kō thinks while it checks.
 - **Voice:** the mic buttons (task box, Kō's chat) use the phone's own speech-to-text, so you can tell Kō a task out
   loud. It's the way in for work that can't be connected (Revolut).
-- **Only true things:** where a feature isn't built yet (Kō's AI, the focus guard, MCP tools, Spend, the wake word),
+- **Only true things:** where a feature isn't built yet (the focus guard, MCP tools, Spend, the wake word),
   the app hides it instead of showing the design's sample.
 
 ## The screens (`web/founders/`)
@@ -91,6 +91,14 @@ The day lives in a database on the phone (SQLite through Room), so it works offl
   unfinished daily goals carry over; the chat starts fresh (`DayPlanner.kt`).
 - **How the screens use it:** `FoundersStore.kt` gives a day as JSON and saves changes; the WebView reaches it through
   `KohuBridge`. The current chunk's timer runs from when it started, across restarts.
+
+### Kō's brain (`api/brain.js`)
+
+`POST /api/ko` answers for the phone and the desktop, through OpenRouter, from today's cloud copy. Add the key once: on the
+`kohulabs-android` Worker, Settings → Variables and Secrets → `OPENROUTER_API_KEY`, as a Secret. `KO_MODEL` and
+`KO_MONTHLY_CAP_USD` (default $20) are in `wrangler.jsonc`; every answer is recorded in `usage`, and he stops at the cap.
+He can only talk for now. Alarms and "add: …" are still done on the phone itself, and without the key or a connection he
+falls back to what the phone can answer alone.
 
 ### In the cloud (`api/`, android.kohulabs.com)
 

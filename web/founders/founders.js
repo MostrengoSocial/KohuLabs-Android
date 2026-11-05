@@ -651,8 +651,9 @@
       out.feedMic = () => this.listenFor('feed');
       out.toggleMic = () => this.listenFor('ko');
       if (S.listening) Object.assign(out, S.listening === 'feed' ? { feedMicBorder: 'var(--accent)', feedMicBg: 'var(--accent)', feedMicColor: 'var(--accent-ink)' } : { micBorder: 'var(--accent)', micBg: 'var(--accent)', micColor: 'var(--accent-ink)' });
-      // Kō: no AI yet, so a greeting from the real day and replies only for what it can really do (send()).
-      out.modelName = say('Kō · no AI yet', 'Kō · ainda sem IA');
+      // A greeting from the real day. Without a signed-in phone he has no brain, and only answers what send() can do itself.
+      const brain = phone && phone.ask && phone.account && phone.account() && phone.account() !== 'null';
+      out.modelName = brain ? 'Kō' : say('Kō · no AI yet', 'Kō · ainda sem IA');
       out.koHint = say('Ask what’s next, add a task (“add: …”) or set an alarm.', 'Pergunta o que vem a seguir, junta uma tarefa (“junta: …”) ou marca um alarme.');
       const hello = f.list.length ? say(`Hi. ${f.left} of ${f.list.length} chunks left today${f.meetings ? `, ${f.meetings} of them meetings` : ''}.`, `Olá. Faltam ${f.left} de ${f.list.length} blocos hoje${f.meetings ? `, ${f.meetings} deles reuniões` : ''}.`)
         : say('Hi. Nothing planned today yet. Add a task with “add: …”.', 'Olá. Ainda nada planeado hoje. Junta uma tarefa com “junta: …”.');
@@ -782,9 +783,29 @@
       }
       const q = text.trim();
       if (!q) return;
+      // Alarms and tasks are done here on the phone. Anything else goes to his brain, when he has one.
+      const action = /alarm|wake me|acorda|despert/i.test(q) || /^\s*(?:add|junta|adiciona)\b/i.test(q);
+      if (!action && phone.ask && phone.account && phone.account() && phone.account() !== 'null') {
+        const pad = n => String(n).padStart(2, '0'), now = new Date();
+        const history = this.state.messages.filter(m => m.text).slice(-12).map(m => ({ who:m.who, text:m.text }));
+        this.asking = q;
+        this.setState(s => ({ messages:[...s.messages, { who:'user', text:q }], input:'', koState:'thinking' }));
+        phone.ask(JSON.stringify({ message:q, date:`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`, time:`${pad(now.getHours())}:${pad(now.getMinutes())}`, lang:this.lang(), history }));
+        return;
+      }
       const reply = this.reply(q);
       this.setState(s => ({ messages:[...s.messages, { who:'user', text:q }], input:'', koState:'thinking' }));
       this.later(() => this.setState(s => ({ messages:[...s.messages, { who:'ko', text:reply }], koState:'speaking' })), 500);
+      this.later(() => this.setState({ koState:'idle' }), 1600);
+    }
+    // His brain answered (KohuBridge.ask). If it couldn't, he answers what he can himself, and says why when it matters.
+    koAnswered(res) {
+      const say = (en, pt) => this.say(en, pt), q = this.asking || '';
+      this.asking = null;
+      const text = res && res.reply ? res.reply
+        : res && res.error === 'spend_cap' ? say('I’ve reached this month’s spending limit, so I’m back to the basics until next month.', 'Cheguei ao limite de gastos deste mês, por isso fico pelo básico até ao próximo.') + ' ' + this.reply(q)
+        : this.reply(q);
+      this.setState(s => ({ messages:[...s.messages, { who:'ko', text }], koState:'speaking' }));
       this.later(() => this.setState({ koState:'idle' }), 1600);
     }
     // What Kō can honestly answer without its AI: the next chunk, the day, adding a task, an alarm.

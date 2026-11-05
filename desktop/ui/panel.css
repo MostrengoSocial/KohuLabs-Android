@@ -4,8 +4,21 @@
 @font-face { font-family: "DM Mono"; src: url("vendor/fonts/dm-mono-latin-ext-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; unicode-range: U+0100-02AF; }
 :root { color-scheme: dark; --bg: #090b11; --surface: #0f131d; --ink: #eeeae0; --muted: #98a3b8; --line: rgba(238, 234, 224, .17); --accent: #5b7bff; --accent-ink: #090b11; --acid: #d4ff3a; }
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 400 14px/1.45 "Bricolage Grotesque", "Segoe UI", sans-serif; }
-main { display: flex; flex-direction: column; min-height: 100vh; padding: 26px 24px 18px; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 400 14px/1.45 "Bricolage Grotesque", "Segoe UI", sans-serif; }
+body { display: flex; flex-direction: column; }
+main { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 26px 24px 18px; }
+#chat { flex: none; display: flex; gap: 8px; padding: 12px 24px 16px; border-top: 1px solid var(--line); background: var(--bg); }
+#chat[hidden] { display: none; }
+#ask { flex: 1; min-width: 0; padding: 10px 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; font: inherit; }
+#ask:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+#send { padding: 0 14px; border: 0; border-radius: 9px; background: var(--ink); color: var(--bg); font-weight: 600; }
+#send[disabled] { opacity: .5; cursor: default; }
+.say { margin: 0; padding: 9px 12px; border-radius: 11px; max-width: 88%; overflow-wrap: anywhere; white-space: pre-wrap; }
+.say.ko { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); }
+.say.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); }
+.say.wait { color: var(--muted); }
+.say.warn { color: var(--acid); }
+.thread { display: flex; flex-direction: column; gap: 8px; }
 h1 { margin: 0; font-size: 40px; line-height: 1.05; font-weight: 600; letter-spacing: -.02em; }
 h2, .mono, .row-time, .tag, footer { font-family: "DM Mono", ui-monospace, Consolas, monospace; font-weight: 400; }
 .date { color: var(--muted); margin-top: 6px; font-size: 13px; }
