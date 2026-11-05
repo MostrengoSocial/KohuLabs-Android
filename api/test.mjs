@@ -26,9 +26,9 @@ const pkce = async () => {
 };
 
 // The app's whole sign-in: browser tab to /auth/google, pretend Google, back to the app, code → token.
-async function signIn({ email = 'hello@kohulabs.com', env = ENV, verifierOverride, claims = {} } = {}) {
+async function signIn({ email = 'hello@kohulabs.com', env = ENV, verifierOverride, claims = {}, redirect } = {}) {
   const { verifier, challenge } = await pkce();
-  const start = await call(`/auth/google?challenge=${challenge}`, { env });
+  const start = await call(`/auth/google?challenge=${challenge}${redirect ? `&redirect=${encodeURIComponent(redirect)}` : ''}`, { env });
   const auth = new URL(start.headers.get('Location'));
   let seen;
   globalThis.fetch = async (url, init) => {
@@ -62,6 +62,22 @@ test('sign-in: Google with PKCE on this Worker; the tab ends in the app with a c
   assert.equal(body.email, 'hello@kohulabs.com'); assert.equal(body.name, 'João Duarte');
   assert.ok(body.expiresAt > now() + 89 * 24 * 3600);
   assert.equal((await verify(body.token, SECRET)).kind, 'app');
+});
+
+test('the desktop app signs in through its loopback address, and only that', async () => {
+  const back = 'http://127.0.0.1:53124/signed-in';
+  const { to, res } = await signIn({ redirect: back });
+  assert.equal(to.origin + to.pathname, back);
+  assert.equal(res.status, 200);
+  assert.equal((await signIn({ redirect: back, email: 'stranger@gmail.com' })).to.href, `${back}?error=not_invited`);
+  for (const bad of ['https://evil.example/signed-in', 'http://127.0.0.1.evil.example:53124/signed-in', 'http://localhost:53124/signed-in',
+    'http://127.0.0.1:53124/other', 'http://127.0.0.1:99999/signed-in', 'http://127.0.0.1:53124/signed-in?x=1', 'com.evil.app:/signed-in', '']) {
+    const res = await call(`/auth/google?challenge=${'a'.repeat(43)}&redirect=${encodeURIComponent(bad)}`);
+    assert.equal(res.status, 400, bad);
+    assert.equal((await res.json()).error, 'bad_redirect');
+  }
+  // A redirect on the callback itself is ignored: the way back only comes from the signed flow.
+  assert.match((await call(`/auth/google/callback?code=x&state=y&redirect=${encodeURIComponent('http://127.0.0.1:1/signed-in')}`)).headers.get('Location'), /^com\.kohulabs\.android:/);
 });
 
 test('sign-in refuses: a wrong verifier, a bad challenge, someone not on the list, a cancelled or tampered sign-in, bad ID tokens', async () => {

@@ -1,0 +1,44 @@
+@font-face { font-family: "Bricolage Grotesque"; src: url("vendor/fonts/bricolage-grotesque-latin-wght-normal.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: "Bricolage Grotesque"; src: url("vendor/fonts/bricolage-grotesque-latin-ext-wght-normal.woff2") format("woff2"); font-weight: 200 800; font-display: swap; unicode-range: U+0100-02AF; }
+@font-face { font-family: "DM Mono"; src: url("vendor/fonts/dm-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "DM Mono"; src: url("vendor/fonts/dm-mono-latin-ext-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; unicode-range: U+0100-02AF; }
+:root { color-scheme: dark; --bg: #090b11; --surface: #0f131d; --ink: #eeeae0; --muted: #98a3b8; --line: rgba(238, 234, 224, .17); --accent: #5b7bff; --accent-ink: #090b11; --acid: #d4ff3a; }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 400 14px/1.45 "Bricolage Grotesque", "Segoe UI", sans-serif; }
+main { display: flex; flex-direction: column; min-height: 100vh; padding: 26px 24px 18px; }
+h1 { margin: 0; font-size: 40px; line-height: 1.05; font-weight: 600; letter-spacing: -.02em; }
+h2, .mono, .row-time, .tag, footer { font-family: "DM Mono", ui-monospace, Consolas, monospace; font-weight: 400; }
+.date { color: var(--muted); margin-top: 6px; font-size: 13px; }
+.lead { margin: 22px 0 6px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.lead.now { border-color: var(--acid); }
+.lead h2 { margin: 0 0 4px; color: var(--muted); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; }
+.lead.now h2 { color: var(--acid); }
+.lead p { margin: 0; font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
+.lead small { display: block; margin-top: 2px; color: var(--muted); font-size: 13px; }
+section { margin-top: 20px; }
+section > h2 { margin: 0 0 6px; color: var(--muted); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; display: flex; justify-content: space-between; }
+ul { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: 52px 1fr auto; gap: 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--line); }
+.row-time { color: var(--muted); font-size: 12.5px; }
+.row-title { overflow-wrap: anywhere; min-width: 0; }
+.tag { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.row.done .row-title, .row.skipped .row-title { color: var(--muted); text-decoration: line-through; }
+.row.current .row-time, .row.current .tag { color: var(--acid); }
+.row.meeting .row-title::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
+.wait { display: block; padding: 9px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.wait b { font-weight: 600; }
+.wait span { display: block; color: var(--muted); font-size: 13px; }
+.empty { color: var(--muted); padding: 10px 0; border-top: 1px solid var(--line); }
+.note { margin: 14px 0 0; color: var(--muted); font-size: 13px; }
+.note.warn { color: var(--acid); }
+.signin { margin: auto 0; padding-bottom: 40px; }
+.signin p { color: var(--muted); max-width: 32ch; font-size: 15px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; }
+.primary { padding: 11px 16px; border: 0; border-radius: 9px; background: var(--ink); color: var(--bg); font-weight: 600; }
+.primary[disabled] { opacity: .65; cursor: default; }
+footer { display: flex; align-items: center; gap: 12px; margin-top: auto; padding-top: 18px; color: var(--muted); font-size: 11.5px; }
+footer .sp { flex: 1; min-width: 0; }
+.link { padding: 3px 0; background: none; border: 0; color: var(--muted); font: inherit; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.link:hover { color: var(--ink); }
+.link[disabled] { cursor: default; text-decoration: none; }
