@@ -4,6 +4,7 @@
 //   reply { reply, cost, spent, cap }
 //   errors  brain_not_configured 503 · spend_cap 402 · too_many 429 · bad_request 400
 //           and when OpenRouter refuses, a 502 saying why: brain_key · brain_credits · brain_model · brain_busy · brain_failed
+//           brain_network and brain_timeout when it can't be reached, brain_empty when it answers with no text
 //
 // The key stays here (OPENROUTER_API_KEY, a Secret in the dashboard), never on a device. Every answer is recorded in
 // usage, and a month's spend can't pass KO_MONTHLY_CAP_USD. save: true also stores the exchange in today's chat, for
@@ -13,11 +14,19 @@ import { migrate, reserve } from './sync.js';
 
 const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = '~anthropic/claude-sonnet-latest';
-const DEFAULT_CAP = 20, PER_MINUTE = 20, MAX_MESSAGE = 4000, MAX_HISTORY = 16, MAX_HISTORY_TEXT = 2000, MAX_TOKENS = 800, TIMEOUT_MS = 40_000;
+const DEFAULT_CAP = 20, PER_MINUTE = 20, MAX_MESSAGE = 4000, MAX_HISTORY = 16, MAX_HISTORY_TEXT = 2000, MAX_TOKENS = 2000, ATTEMPTS = 2, TIMEOUT_MS = 40_000;
 
 // Why OpenRouter refused, in a word the apps can show. Its own message goes to the logs: it never holds your data.
 export const refusal = (status) => (status === 401 || status === 403 ? 'brain_key' : status === 402 ? 'brain_credits' : status === 400 || status === 404 ? 'brain_model' : status === 429 ? 'brain_busy' : 'brain_failed');
 const logRefusal = async (res) => { let detail = ''; try { detail = String((await res.json()).error?.message || '').slice(0, 300); } catch (_) {} console.error('openrouter refused', res.status, detail); };
+
+const errorOf = (e) => (e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'brain_timeout' : 'brain_network');
+// A model may answer in a list of parts rather than one string.
+export const textOf = (message) => {
+  const c = message && message.content;
+  if (typeof c === 'string') return c.trim();
+  return Array.isArray(c) ? c.map((p) => (p && typeof p.text === 'string' ? p.text : '')).join('').trim() : '';
+};
 
 export const capOf = (env) => { const c = Number(env.KO_MONTHLY_CAP_USD); return Number.isFinite(c) && c > 0 ? c : DEFAULT_CAP; };
 
@@ -87,24 +96,33 @@ export async function ask(env, user, body) {
   if (recent >= PER_MINUTE) return { status: 429, error: 'too_many' };
 
   const context = await dayContext(db, user.email, q.date), model = env.KO_MODEL || DEFAULT_MODEL;
-  let data;
-  try {
-    const res = await fetch(OPENROUTER, {
-      method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://kohulabs.com', 'X-Title': 'Ko' },
-      body: JSON.stringify({ model, max_tokens: MAX_TOKENS, messages: [{ role: 'system', content: systemPrompt(q, context, user.name) }, ...q.history, { role: 'user', content: q.message }] }),
-    });
-    if (!res.ok) { await logRefusal(res); return { status: 502, error: refusal(res.status) }; }
-    data = await res.json();
-  } catch (e) { console.error('openrouter', e.name); return { status: 502, error: 'brain_failed' }; }
-  if (data && data.error) { console.error('openrouter error', data.error.code, String(data.error.message || '').slice(0, 300)); return { status: 502, error: refusal(Number(data.error.code)) }; }
-  const choice = data && data.choices && data.choices[0], reply = choice && !choice.error && choice.message && typeof choice.message.content === 'string' ? choice.message.content.trim() : '';
+  // A pasted key can carry a stray space or line break, which makes the request itself fail.
+  const key = String(env.OPENROUTER_API_KEY).trim();
+  const request = JSON.stringify({ model, max_tokens: MAX_TOKENS, messages: [{ role: 'system', content: systemPrompt(q, context, user.name) }, ...q.history, { role: 'user', content: q.message }] });
+  let data, failure = 'brain_failed';
+  for (let attempt = 1; attempt <= ATTEMPTS && !data; attempt++) { // a passing hiccup gets one more try; a refusal doesn't
+    try {
+      const res = await fetch(OPENROUTER, {
+        method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS),
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://kohulabs.com', 'X-Title': 'Ko' },
+        body: request,
+      });
+      if (res.ok) { data = await res.json(); break; }
+      await logRefusal(res);
+      failure = refusal(res.status);
+      if (res.status < 500) break;
+    } catch (e) { console.error('openrouter unreachable', attempt, e && e.name, String(e && e.message).slice(0, 200)); failure = errorOf(e); }
+  }
+  if (!data) return { status: 502, error: failure };
+  if (data.error) { console.error('openrouter error', data.error.code, String(data.error.message || '').slice(0, 300)); return { status: 502, error: refusal(Number(data.error.code)) }; }
+  const choice = data.choices && data.choices[0], reply = choice && !choice.error ? textOf(choice.message) : '';
+  if (!reply) console.error('openrouter empty', choice && choice.finish_reason, choice && choice.error && String(choice.error.message).slice(0, 300), data.model);
 
   // Even an empty answer may have cost something, so usage is recorded first.
   const u = (data && data.usage) || {}, cost = Number.isFinite(u.cost) ? u.cost : 0, at = Date.now(), seq = await reserve(db, user.email, 1);
   await db.prepare(`INSERT INTO usage (user_id, seq, id, at, model, provider, purpose, tokens_in, tokens_out, cache_read, cache_write, cost, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 'openrouter', 'chat', ?, ?, ?, ?, ?, ?, 0)`)
     .bind(user.email, seq, crypto.randomUUID(), at, String(data && data.model || model).slice(0, 100), u.prompt_tokens || 0, u.completion_tokens || 0, (u.prompt_tokens_details && u.prompt_tokens_details.cached_tokens) || 0, (u.prompt_tokens_details && u.prompt_tokens_details.cache_write_tokens) || 0, cost, at).run();
-  if (!reply) return { status: 502, error: 'brain_failed' };
+  if (!reply) return { status: 502, error: 'brain_empty' };
   if (q.save) await save(db, user.email, q, q.message, reply);
   return { status: 200, reply, cost, spent: spent + cost, cap };
 }
