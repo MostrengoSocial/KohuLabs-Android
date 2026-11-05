@@ -32,5 +32,7 @@
   // The Calendar and Gmail import: every hour from 05:00 to 21:00 UTC (a sync also starts one when it is due).
   "triggers": { "crons": ["0 5-21 * * *"] },
   // keep any variables added in the dashboard when deploying
-  "keep_vars": true
+  "keep_vars": true,
+  // the Worker's logs in the dashboard → Observability (Kō's brain says there why OpenRouter refused)
+  "observability": { "enabled": true }
 }

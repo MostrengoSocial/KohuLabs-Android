@@ -366,3 +366,14 @@ test('Kō refuses without a sign-in or key, and on bad input; a failed answer sa
   assert.equal((await empty.askKo()).status, 502);
   assert.equal((await pulled(empty.token, empty.env)).usage.length, 1, 'an empty answer is still recorded');
 });
+
+test('when OpenRouter refuses, Kō says why', async () => {
+  for (const [upstream, error] of [[401, 'brain_key'], [403, 'brain_key'], [402, 'brain_credits'], [400, 'brain_model'], [404, 'brain_model'], [429, 'brain_busy'], [500, 'brain_failed']]) {
+    const res = await (await brain({ upstream })).askKo();
+    assert.equal(res.status, 502);
+    assert.equal((await res.json()).error, error, String(upstream));
+  }
+  const { askKo } = await brain();
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { code: 402, message: 'no credits' } }), { status: 200 });
+  assert.equal((await (await askKo()).json()).error, 'brain_credits');
+});

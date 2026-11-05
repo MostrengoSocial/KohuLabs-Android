@@ -43,7 +43,7 @@ function render() {
     shown.length || pending || chatError ? h('section', { id: 'thread' }, h('h2', {}, h('span', {}, t.chat)), h('div', { class: 'thread', 'aria-live': 'polite' },
       shown.map((m) => h('p', { class: `say ${m.who}` }, m.text)),
       pending ? h('p', { class: 'say ko wait' }, t.thinking) : null,
-      chatError ? h('p', { class: 'say ko warn', role: 'alert' }, t.brainErrors[chatError] || t.brainErrors.other) : null)) : null,
+      chatError ? h('p', { class: 'say ko warn', role: 'alert' }, t.brainErrors[chatError] || `${t.brainErrors.other} ${t.errorCode(chatError)}`) : null)) : null,
     offline ? h('p', { class: 'note warn', role: 'status' }, t.offline) : h('p', { class: 'note' }, t.readOnly),
     h('footer', {}, syncTime && !busy ? h('span', {}, t.synced(syncTime)) : null, h('span', { class: 'sp' }),
       h('button', { class: 'link', disabled: busy, on: refresh }, busy ? t.refreshing : t.refresh), h('button', { class: 'link', on: signOut }, t.signOut)),

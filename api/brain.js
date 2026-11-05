@@ -2,7 +2,8 @@
 //
 //   body  { message, date: 'YYYY-MM-DD', time: 'HH:MM', lang: 'en'|'pt', history: [{ who: 'user'|'ko', text }], save? }
 //   reply { reply, cost, spent, cap }
-//   errors  brain_not_configured 503 · spend_cap 402 · too_many 429 · brain_failed 502 · bad_request 400
+//   errors  brain_not_configured 503 · spend_cap 402 · too_many 429 · bad_request 400
+//           and when OpenRouter refuses, a 502 saying why: brain_key · brain_credits · brain_model · brain_busy · brain_failed
 //
 // The key stays here (OPENROUTER_API_KEY, a Secret in the dashboard), never on a device. Every answer is recorded in
 // usage, and a month's spend can't pass KO_MONTHLY_CAP_USD. save: true also stores the exchange in today's chat, for
@@ -13,6 +14,10 @@ import { migrate, reserve } from './sync.js';
 const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = '~anthropic/claude-sonnet-latest';
 const DEFAULT_CAP = 20, PER_MINUTE = 20, MAX_MESSAGE = 4000, MAX_HISTORY = 16, MAX_HISTORY_TEXT = 2000, MAX_TOKENS = 800, TIMEOUT_MS = 40_000;
+
+// Why OpenRouter refused, in a word the apps can show. Its own message goes to the logs: it never holds your data.
+export const refusal = (status) => (status === 401 || status === 403 ? 'brain_key' : status === 402 ? 'brain_credits' : status === 400 || status === 404 ? 'brain_model' : status === 429 ? 'brain_busy' : 'brain_failed');
+const logRefusal = async (res) => { let detail = ''; try { detail = String((await res.json()).error?.message || '').slice(0, 300); } catch (_) {} console.error('openrouter refused', res.status, detail); };
 
 export const capOf = (env) => { const c = Number(env.KO_MONTHLY_CAP_USD); return Number.isFinite(c) && c > 0 ? c : DEFAULT_CAP; };
 
@@ -89,9 +94,10 @@ export async function ask(env, user, body) {
       headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://kohulabs.com', 'X-Title': 'Ko' },
       body: JSON.stringify({ model, max_tokens: MAX_TOKENS, messages: [{ role: 'system', content: systemPrompt(q, context, user.name) }, ...q.history, { role: 'user', content: q.message }] }),
     });
-    if (!res.ok) { console.error('openrouter', res.status); return { status: 502, error: 'brain_failed' }; }
+    if (!res.ok) { await logRefusal(res); return { status: 502, error: refusal(res.status) }; }
     data = await res.json();
   } catch (e) { console.error('openrouter', e.name); return { status: 502, error: 'brain_failed' }; }
+  if (data && data.error) { console.error('openrouter error', data.error.code, String(data.error.message || '').slice(0, 300)); return { status: 502, error: refusal(Number(data.error.code)) }; }
   const choice = data && data.choices && data.choices[0], reply = choice && !choice.error && choice.message && typeof choice.message.content === 'string' ? choice.message.content.trim() : '';
 
   // Even an empty answer may have cost something, so usage is recorded first.
