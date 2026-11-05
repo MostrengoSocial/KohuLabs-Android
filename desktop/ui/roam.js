@@ -72,11 +72,12 @@ export function createRoamer({ width, height, size, x, y, random = Math.random }
     /** Where a drag dropped him. */
     place(x, y) { k.x = x; k.y = y; k.baseY = y; k.cx = x; k.cy = y; },
     /** Something needs you: he goes to this spot and stays until release(). */
-    call(x, y) { const b = bounds(); target = { x: clamp(x, b.minX, b.maxX), y: clamp(y, b.minY, b.maxY) }; },
+    call(x, y, speed = CALL_SPEED) { const b = bounds(); target = { x: clamp(x, b.minX, b.maxX), y: clamp(y, b.minY, b.maxY), speed }; },
     release() { if (target) { target = null; if (!held) enter('stroll'); } },
     step(dt) {
+      if (!(dt > 0)) return;
       if (target) {
-        const dx = target.x - k.x, dy = target.y - k.y, d = Math.hypot(dx, dy), move = CALL_SPEED * dt;
+        const dx = target.x - k.x, dy = target.y - k.y, d = Math.hypot(dx, dy), move = target.speed * dt;
         if (d <= move) { k.x = target.x; k.y = target.y; } else { k.x += (dx / d) * move; k.y += (dy / d) * move; }
         return;
       }

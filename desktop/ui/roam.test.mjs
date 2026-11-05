@@ -62,3 +62,9 @@ test('a call beyond the screen stays on the screen', () => {
   for (let i = 0; i < 400; i++) r.step(1 / 30);
   assert.deepEqual([r.x, r.y], [1680, 800]);
 });
+
+test('a clock that runs backwards or stands still never breaks him', () => {
+  const r = make(); r.call(r.x, r.y);
+  for (const dt of [-0.01, 0, NaN]) r.step(dt);
+  assert.ok(Number.isFinite(r.x) && Number.isFinite(r.y));
+});

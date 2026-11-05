@@ -91,6 +91,12 @@ fn ko_area(app: AppHandle) -> Result<Area, String> {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct Point {
+    x: f64,
+    y: f64,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct Moved {
     x: f64,
     y: f64,
@@ -199,6 +205,7 @@ fn sign_out(app: AppHandle) {
 fn watch(app: AppHandle) {
     std::thread::spawn(move || {
         let (mut through, mut hovering, mut visible, mut idle, mut tick) = (None, false, false, false, 0u32);
+        let (mut last_cursor, mut cursor_at_input, mut input, mut window) = ((0.0f64, 0.0f64), (0.0f64, 0.0f64), platform::last_input(), None);
         loop {
             std::thread::sleep(Duration::from_millis(40));
             let Some(win) = ko(&app) else { continue };
@@ -220,6 +227,35 @@ fn watch(app: AppHandle) {
             if over != hovering {
                 hovering = over;
                 let _ = app.emit_to("ko", "ko-hover", over);
+            }
+
+            // You, a dozen times a second: his eyes follow the mouse, and a key shows as input without mouse movement.
+            if tick % 2 == 0 && visible {
+                if let Ok(c) = app.cursor_position() {
+                    if (c.x, c.y) != last_cursor {
+                        last_cursor = (c.x, c.y);
+                        let _ = app.emit_to("ko", "ko-mouse", Point { x: c.x, y: c.y });
+                    }
+                }
+                let now_input = platform::last_input();
+                if now_input != input {
+                    input = now_input;
+                    if last_cursor == cursor_at_input {
+                        let _ = app.emit_to("ko", "ko-key", platform::focus().map(|f| f.1));
+                    }
+                    cursor_at_input = last_cursor;
+                }
+            }
+            if tick % 8 == 0 && visible {
+                if let Some((id, point)) = platform::focus() {
+                    if window != Some(id) {
+                        // Not a glance on the very first look around.
+                        if window.is_some() {
+                            let _ = app.emit_to("ko", "ko-window", point);
+                        }
+                        window = Some(id);
+                    }
+                }
             }
 
             // Full-screen apps and your breaks, every couple of seconds.

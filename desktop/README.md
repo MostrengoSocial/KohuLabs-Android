@@ -8,6 +8,11 @@ come from `web/` at build time (`scripts/copy-web.mjs`), so the phone and the de
   naps after 5 minutes without input (nothing is drawn while he sleeps).
 - **His wake** (`ui/wake-core.js`, `ui/wake.js`): the ASCII glyphs he leaves behind, as in the homepage intro, drawn in a
   see-through window over the display. Clicks never land on it, and it stops drawing when no glyph is left.
+- **Paying attention** (`ui/attention.js`, `src-tauri/src/platform.rs`): his eyes follow your mouse across the screen. When
+  you type he stops and looks at the text cursor (or the window, in apps that don't report it), and after a long stretch he
+  comes closer without covering it. A window you switch to gets a glance. He can't see which keys you press or what's on
+  screen: there is no keyboard hook, no window titles, no capture. Typing is only "input without mouse movement", so a
+  scroll wheel can look like typing.
 - **Clicks** (`src-tauri/src/main.rs`, the watcher): pass through to the windows below everywhere except on Kō.
 - **Out of the way** (`src-tauri/src/platform.rs`): hidden when Windows reports a full-screen app, a presentation or
   "busy". A call in a normal window is not detected; use "Show Kō" in the tray.
