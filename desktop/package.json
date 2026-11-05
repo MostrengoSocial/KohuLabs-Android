@@ -1,0 +1,12 @@
+{
+  "name": "kohulabs-desktop",
+  "private": true,
+  "scripts": {
+    "prepare-ui": "node scripts/copy-web.mjs",
+    "tauri": "tauri",
+    "test": "node --test ui/roam.test.mjs ui/day.test.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

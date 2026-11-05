@@ -1,0 +1,31 @@
+[package]
+name = "kohulabs-desktop"
+version = "0.1.0"
+description = "Kō on the desktop"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["sync"] }
+keyring = { version = "3", features = ["windows-native"] }
+tiny_http = "0.12"
+open = "5"
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_SystemInformation"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "s"
+strip = true

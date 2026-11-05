@@ -1,7 +1,9 @@
 // kohulabs-android API (Cloudflare Worker): sign-in and the cloud copy for the Kō Android app (android/).
 //
 //   GET  /auth/google?challenge=…   Google sign-in, opened by the app in a browser tab. It ends by sending the app a
-//                                   one-time code: com.kohulabs.android:/signed-in?code=… (or ?error=…)
+//                                   one-time code: com.kohulabs.android:/signed-in?code=… (or ?error=…).
+//                                   The desktop app adds &redirect=http://127.0.0.1:<port>/signed-in, its own loopback
+//                                   address (RFC 8252); nothing else is accepted.
 //   GET  /auth/google/callback      Google sends the browser back here
 //   POST /api/token                 {code, verifier} → {token, email, name, expiresAt}: the app's sign-in (Bearer),
 //                                   90 days. PKCE: only the app that started the sign-in knows the verifier.
@@ -33,17 +35,22 @@ const allowed = (email, env) => emailList(env.FOUNDER_EMAILS).includes(email);
 // The sign-in flow cookie. Path=/ because browsers silently drop a __Host- cookie with any other path.
 const flowCookie = (url) => (url.protocol === 'https:' ? '__Host-kohulabs_android_oauth' : 'kohulabs_android_oauth');
 const clearFlow = (url) => ['Set-Cookie', cookie(flowCookie(url), '', { secure: url.protocol === 'https:', maxAge: 0 })];
-const toApp = (query, url) => redirect(`${APP_REDIRECT}?${query}`, [clearFlow(url)]);
+const toApp = (query, url, target = APP_REDIRECT) => redirect(`${target}?${query}`, [clearFlow(url)]);
+// The desktop app's loopback address. Only this machine can receive it, and the code it carries needs the PKCE verifier.
+const LOOPBACK = /^http:\/\/127\.0\.0\.1:([1-9][0-9]{0,4})\/signed-in$/;
+const okLoopback = (v) => { const m = LOOPBACK.exec(v); return !!m && Number(m[1]) <= 65535; };
 
 // ---- Google sign-in, ending in the app ---------------------------------------------------------------------------
 async function startGoogle(env, url) {
   if (!configured(env)) return json({ error: 'auth_not_configured' }, 503);
   const app = url.searchParams.get('challenge') || '';
   if (!/^[A-Za-z0-9_-]{43}$/.test(app)) return json({ error: 'bad_challenge' }, 400);
+  const target = url.searchParams.get('redirect');
+  if (target !== null && !okLoopback(target)) return json({ error: 'bad_redirect' }, 400);
   const c = googleConfig(env);
   const state = randomToken(), verifier = randomToken(48), nonce = randomToken();
   const challenge = b64url(await crypto.subtle.digest('SHA-256', enc.encode(verifier)));
-  const flow = await sign({ kind: 'flow', state, verifier, nonce, app, exp: Math.floor(Date.now() / 1000) + OAUTH_SECONDS }, c.secret);
+  const flow = await sign({ kind: 'flow', state, verifier, nonce, app, ...(target ? { target } : {}), exp: Math.floor(Date.now() / 1000) + OAUTH_SECONDS }, c.secret);
   const q = new URLSearchParams({
     client_id: c.googleId, redirect_uri: `${url.origin}/auth/google/callback`, response_type: 'code', scope: ['openid', 'email', 'profile', ...IMPORT_SCOPES].join(' '),
     state, nonce, code_challenge: challenge, code_challenge_method: 'S256',
@@ -55,16 +62,18 @@ async function startGoogle(env, url) {
 
 async function finishGoogle(request, env, url) {
   if (!configured(env)) return json({ error: 'auth_not_configured' }, 503);
-  if (url.searchParams.get('error')) return toApp('error=cancelled', url);
   const c = googleConfig(env);
   const flow = await verify(readCookie(request, flowCookie(url)), c.secret);
+  // The way back comes from the signed flow cookie, never from this request.
+  const target = flow && flow.kind === 'flow' && okLoopback(flow.target) ? flow.target : APP_REDIRECT;
+  if (url.searchParams.get('error')) return toApp('error=cancelled', url, target);
   const code = url.searchParams.get('code'), state = url.searchParams.get('state');
-  if (!flow || flow.kind !== 'flow' || !code || !state || state !== flow.state) return toApp('error=failed', url);
+  if (!flow || flow.kind !== 'flow' || !code || !state || state !== flow.state) return toApp('error=failed', url, target);
   const signedIn = await googleSignIn(c, { code, verifier: flow.verifier, nonce: flow.nonce, redirectUri: `${url.origin}/auth/google/callback` });
-  if (!signedIn) return toApp('error=failed', url);
+  if (!signedIn) return toApp('error=failed', url, target);
   const { claims, tokens } = signedIn;
   const email = String(claims.email).toLowerCase();
-  if (!allowed(email, env)) return toApp('error=not_invited', url);
+  if (!allowed(email, env)) return toApp('error=not_invited', url, target);
   // Keep Google access for the import, encrypted; the next sync imports straight away (last_import_at cleared).
   if (env.DB && tokens.refresh_token) {
     await migrate(env.DB);
@@ -74,7 +83,7 @@ async function finishGoogle(request, env, url) {
   }
   // A short-lived code the app can only redeem with its PKCE verifier (POST /api/token).
   const appCode = await sign({ kind: 'code', email, name: claims.name || email, challenge: flow.app, exp: Math.floor(Date.now() / 1000) + CODE_SECONDS }, c.secret);
-  return toApp(`code=${encodeURIComponent(appCode)}`, url);
+  return toApp(`code=${encodeURIComponent(appCode)}`, url, target);
 }
 
 // ---- the app's token and its sync ----------------------------------------------------------------------------------

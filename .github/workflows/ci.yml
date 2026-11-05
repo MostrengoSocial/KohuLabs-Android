@@ -79,3 +79,39 @@ jobs:
           name: kohulabs-android-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+  desktop:
+    name: Desktop app (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - run: npm test
+      - run: npm install
+      - run: npm run prepare-ui
+      - name: Rust tests
+        working-directory: desktop/src-tauri
+        run: cargo test
+      - run: npm run tauri -- build
+      - name: Keep the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ko-windows-installer
+          path: desktop/src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 30
+      - name: Keep Cargo.lock for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: ko-cargo-lock
+          path: desktop/src-tauri/Cargo.lock
+          retention-days: 7

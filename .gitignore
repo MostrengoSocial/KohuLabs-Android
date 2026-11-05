@@ -3,3 +3,7 @@ tests/playwright-report/
 tests/test-results/
 .wrangler/
 .dev.vars
+desktop/ui/vendor/
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/

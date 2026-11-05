@@ -18,6 +18,7 @@ web/          the app's screens (web/founders/), plus the files they use: Kō's 
 api/          the Cloudflare Worker (android.kohulabs.com): Google sign-in for the app, and the cloud copy (D1)
 db/           the data model: migrations/ (the cloud's tables) and check-schema.mjs
 tests/        browser tests for the screens (Playwright)
+desktop/      Kō on Windows (Tauri): he roams your desktop, and shows your day from the same cloud (see desktop/README.md)
 wrangler.jsonc  the Worker's Cloudflare config
 ```
 
