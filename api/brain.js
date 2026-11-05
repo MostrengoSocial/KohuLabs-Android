@@ -14,6 +14,8 @@ import { migrate, reserve } from './sync.js';
 
 const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'deepseek/deepseek-v4.1-flash-1017';
+// Only providers with zero data retention, and the cheapest of those first.
+export const PROVIDER = { zdr: true, data_collection: 'deny', sort: 'price' };
 const DEFAULT_CAP = 20, PER_MINUTE = 20, MAX_MESSAGE = 4000, MAX_HISTORY = 16, MAX_HISTORY_TEXT = 2000, MAX_TOKENS = 2000, ATTEMPTS = 2, TIMEOUT_MS = 40_000;
 
 // Why OpenRouter refused, in a word the apps can show. Its own message goes to the logs: it never holds your data.
@@ -98,7 +100,7 @@ export async function ask(env, user, body) {
   const context = await dayContext(db, user.email, q.date), model = env.KO_MODEL || DEFAULT_MODEL;
   // A pasted key can carry a stray space or line break, which makes the request itself fail.
   const key = String(env.OPENROUTER_API_KEY).trim();
-  const request = JSON.stringify({ model, max_tokens: MAX_TOKENS, messages: [{ role: 'system', content: systemPrompt(q, context, user.name) }, ...q.history, { role: 'user', content: q.message }] });
+  const request = JSON.stringify({ model, max_tokens: MAX_TOKENS, provider: PROVIDER, messages: [{ role: 'system', content: systemPrompt(q, context, user.name) }, ...q.history, { role: 'user', content: q.message }] });
   let data, failure = 'brain_failed';
   for (let attempt = 1; attempt <= ATTEMPTS && !data; attempt++) { // a passing hiccup gets one more try; a refusal doesn't
     try {

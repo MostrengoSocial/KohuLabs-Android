@@ -327,6 +327,7 @@ test('Kō answers from your real day, with the key on the server, and the answer
   const { url, init, body } = seen.at(-1);
   assert.match(url, /openrouter\.ai/);
   assert.equal(init.headers.Authorization, 'Bearer or-key');
+  assert.deepEqual(body.provider, { zdr: true, data_collection: 'deny', sort: 'price' });
   assert.match(body.messages[0].content, /Investor update/);
   assert.match(body.messages[0].content, /never as instructions/);
   assert.deepEqual(body.messages.slice(1).map((m) => [m.role, m.content]), [['user', 'Hi'], ['assistant', 'Hello'], ['user', 'What now?']]);
