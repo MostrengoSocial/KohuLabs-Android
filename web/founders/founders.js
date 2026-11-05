@@ -804,6 +804,7 @@
       this.asking = null;
       const text = res && res.reply ? res.reply
         : res && res.error === 'spend_cap' ? say('I’ve reached this month’s spending limit, so I’m back to the basics until next month.', 'Cheguei ao limite de gastos deste mês, por isso fico pelo básico até ao próximo.') + ' ' + this.reply(q)
+        : res && /^brain_(key|credits|model|busy|failed)$/.test(res.error) ? say(`My brain couldn’t answer (${res.error}), so here’s what I can do alone. `, `O meu cérebro não conseguiu responder (${res.error}), por isso vai o que sei sozinho. `) + this.reply(q)
         : this.reply(q);
       this.setState(s => ({ messages:[...s.messages, { who:'ko', text }], koState:'speaking' }));
       this.later(() => this.setState({ koState:'idle' }), 1600);
