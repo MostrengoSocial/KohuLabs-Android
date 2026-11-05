@@ -2,17 +2,18 @@
 // (web/founders/founders.js), so it is tested on its own: `node --test desktop/ui/roam.test.mjs`.
 // Positions are CSS pixels inside the screen's work area, for the top-left corner of Kō's window.
 
-// behaviour: [mood, state, seconds, how likely]
+// behaviour: [mood, state, seconds, how likely]. Roaming stays calm: the 'thinking' and 'speaking' states make his
+// glyphs race, and are kept for when he is really working on an answer.
 export const BEHAVIOURS = {
   stroll: ['happy', 'idle', 6, 3],
-  dash: ['surprised', 'speaking', 2.6, 1],
+  dash: ['happy', 'idle', 2.6, 1],
   wander: ['curious', 'idle', 7, 3],
   peek: ['curious', 'listening', 5, 2],
   nap: ['sleepy', 'idle', 6, 2],
-  ponder: ['neutral', 'thinking', 5, 2],
-  hum: ['happy', 'speaking', 3.5, 2],
+  ponder: ['neutral', 'idle', 5, 2],
+  hum: ['happy', 'idle', 3.5, 2],
   swoop: ['happy', 'idle', 0, 5],    // a long curved flight across the screen; how long depends on how far
-  loop: ['happy', 'speaking', 0, 2], // a wide loop-the-loop
+  loop: ['happy', 'idle', 0, 2], // a wide loop-the-loop
 };
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
