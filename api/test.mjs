@@ -377,3 +377,27 @@ test('when OpenRouter refuses, Kō says why', async () => {
   globalThis.fetch = async () => new Response(JSON.stringify({ error: { code: 402, message: 'no credits' } }), { status: 200 });
   assert.equal((await (await askKo()).json()).error, 'brain_credits');
 });
+
+test('a stray line break in the key is harmless, and a passing hiccup gets one more try', async () => {
+  const { askKo, seen } = await brain({ env: { OPENROUTER_API_KEY: ' or-key\n' } });
+  assert.equal((await askKo()).status, 200);
+  assert.equal(seen.at(-1).init.headers.Authorization, 'Bearer or-key');
+  const flaky = await brain();
+  let calls = 0;
+  globalThis.fetch = async () => (++calls === 1 ? new Response('{}', { status: 503 }) : new Response(JSON.stringify({ choices: [{ message: { content: [{ type: 'text', text: 'In parts' }] } }] })));
+  assert.equal((await (await flaky.askKo()).json()).reply, 'In parts');
+  assert.equal(calls, 2);
+});
+
+test('each way of failing has its own name, and a refusal is not retried', async () => {
+  const { askKo } = await brain();
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; throw new TypeError('bad'); };
+  assert.equal((await (await askKo()).json()).error, 'brain_network'); assert.equal(calls, 2);
+  globalThis.fetch = async () => { throw Object.assign(new Error('late'), { name: 'TimeoutError' }); };
+  assert.equal((await (await askKo()).json()).error, 'brain_timeout');
+  calls = 0; globalThis.fetch = async () => { calls++; return new Response('{}', { status: 401 }); };
+  assert.equal((await (await askKo()).json()).error, 'brain_key'); assert.equal(calls, 1);
+  globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: null } }] }));
+  assert.equal((await (await askKo()).json()).error, 'brain_empty');
+});
