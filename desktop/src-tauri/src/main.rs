@@ -170,6 +170,17 @@ async fn refresh_day(app: AppHandle) -> Result<day::Cache, String> {
 }
 
 #[tauri::command]
+async fn ask_ko(app: AppHandle, question: serde_json::Value) -> Result<serde_json::Value, String> {
+    let _ = app.emit_to("ko", "ko-thinking", true); // he shows it wherever he is on the screen
+    let answer = day::ask(&app.state::<Shared>().http, question).await;
+    let _ = app.emit_to("ko", "ko-thinking", false);
+    if answer.is_ok() {
+        let _ = pull_and_tell(&app).await;
+    }
+    answer
+}
+
+#[tauri::command]
 fn get_account() -> Option<auth::AccountView> {
     auth::load().as_ref().map(auth::AccountView::from)
 }
@@ -333,7 +344,7 @@ fn main() {
             wake_area: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
-            ko_area, move_ko, set_hit, set_dragging, open_panel, get_day, sync_day, refresh_day, get_account, sign_in, sign_out
+            ko_area, move_ko, set_hit, set_dragging, open_panel, get_day, sync_day, refresh_day, ask_ko, get_account, sign_in, sign_out
         ])
         .on_window_event(|window, event| {
             // Closing Today only hides it; Kō keeps going until Quit in the tray.

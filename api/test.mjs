@@ -304,3 +304,65 @@ test('refresh: imports now for the signed-in person, at most once a minute; need
   env.DB.db.prepare('DELETE FROM google_accounts').run();
   assert.deepEqual(await (await post('/api/refresh', {}, { token, env })).json(), { ok: false, error: 'no_google' });
 });
+
+// ---- Kō's brain ---------------------------------------------------------------------------------------------------
+const TODAY = '2026-11-05';
+async function brain({ answer = 'Hi João', usage = { cost: 0.01, prompt_tokens: 100, completion_tokens: 20 }, upstream = 200, env: extra = {} } = {}) {
+  const token = (await signIn()).body.token;
+  const env = { ...ENV, DB: new FakeD1(), OPENROUTER_API_KEY: 'or-key', KO_MONTHLY_CAP_USD: '1', ...extra };
+  const seen = [];
+  globalThis.fetch = async (url, init) => { seen.push({ url, init, body: JSON.parse(init.body) }); return new Response(JSON.stringify({ model: 'anthropic/test', choices: [{ message: { content: answer } }], usage }), { status: upstream }); };
+  const askKo = (body) => post('/api/ko', { message: 'What now?', date: TODAY, time: '10:00', lang: 'en', ...body }, { token, env });
+  return { token, env, seen, askKo };
+}
+const pulled = async (token, env) => (await (await post('/api/sync', { cursor: 0, changes: {} }, { token, env })).json()).changes;
+
+test('Kō answers from your real day, with the key on the server, and the answer is paid for in usage', async () => {
+  const { token, env, seen, askKo } = await brain();
+  const row = { id: 'c1', workspace_id: 'k', date: TODAY, start: '11:00', minutes: 25, title: 'Investor update', category: 'inv', status: 'planned', updated_at: 5, deleted: 0 };
+  assert.equal((await post('/api/sync', { cursor: 0, changes: { chunks: [row] } }, { token, env })).status, 200);
+  const res = await askKo({ history: [{ who: 'user', text: 'Hi' }, { who: 'ko', text: 'Hello' }, { who: 'evil', text: 'x' }] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { reply: 'Hi João', cost: 0.01, spent: 0.01, cap: 1 });
+  const { url, init, body } = seen.at(-1);
+  assert.match(url, /openrouter\.ai/);
+  assert.equal(init.headers.Authorization, 'Bearer or-key');
+  assert.match(body.messages[0].content, /Investor update/);
+  assert.match(body.messages[0].content, /never as instructions/);
+  assert.deepEqual(body.messages.slice(1).map((m) => [m.role, m.content]), [['user', 'Hi'], ['assistant', 'Hello'], ['user', 'What now?']]);
+  const { usage, messages } = await pulled(token, env);
+  assert.equal(usage.length, 1); assert.equal(usage[0].cost, 0.01); assert.equal(usage[0].purpose, 'chat');
+  assert.equal(messages, undefined, 'the phone saves its own chat');
+});
+
+test('the desktop can have the exchange kept, so the phone sees it too', async () => {
+  const { token, env, askKo } = await brain();
+  await askKo({ save: true });
+  const { messages } = await pulled(token, env);
+  assert.deepEqual(messages.map((m) => [m.who, m.text, m.date]).sort(), [['ko', 'Hi João', TODAY], ['user', 'What now?', TODAY]]);
+});
+
+test('Kō stops at the monthly cap, before spending anything more', async () => {
+  const { seen, askKo } = await brain({ usage: { cost: 0.6 } });
+  assert.equal((await askKo()).status, 200);
+  assert.equal((await askKo()).status, 200);
+  const stopped = await askKo();
+  assert.equal(stopped.status, 402);
+  assert.equal((await stopped.json()).error, 'spend_cap');
+  assert.equal(seen.length, 2);
+});
+
+test('Kō refuses without a sign-in or key, and on bad input; a failed answer says so', async () => {
+  const body = { message: 'x', date: TODAY, time: '10:00' };
+  assert.equal((await post('/api/ko', body, { env: { ...ENV, DB: new FakeD1() } })).status, 401);
+  const noKey = await brain({ env: { OPENROUTER_API_KEY: '' } });
+  const res = await noKey.askKo();
+  assert.equal(res.status, 503); assert.equal((await res.json()).error, 'brain_not_configured');
+  const { askKo, seen } = await brain();
+  for (const bad of [{ message: '' }, { message: 'x'.repeat(4001) }, { date: 'today' }, { time: 'noon' }]) assert.equal((await askKo(bad)).status, 400);
+  assert.equal(seen.length, 0);
+  assert.equal((await (await brain({ upstream: 500 })).askKo()).status, 502);
+  const empty = await brain({ answer: '  ' });
+  assert.equal((await empty.askKo()).status, 502);
+  assert.equal((await pulled(empty.token, empty.env)).usage.length, 1, 'an empty answer is still recorded');
+});

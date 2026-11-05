@@ -3,6 +3,7 @@
 
 export const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 export const minutesOf = (hhmm) => { const [h, m] = String(hhmm).split(':').map(Number); return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : 0; };
+export const dayKeyNow = (d) => ({ date: dateKey(d), time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` });
 const rowsOf = (tables, name) => Object.values((tables && tables[name]) || {}).filter((r) => r && !r.deleted);
 const SHOWN = new Set(['planned', 'done', 'skipped']); // a split, moved or dropped chunk has been replaced by others
 
@@ -13,6 +14,8 @@ const COPY = {
     waiting: 'Waiting on you', meeting: 'Meeting', done: 'Done', skipped: 'Skipped',
     signInTitle: 'Bring in your day', signInBody: 'Sign in with the same Google account as your phone. Your day stays in sync.', signIn: 'Continue with Google', signingIn: 'Waiting for the browser…',
     signOut: 'Sign out', refresh: 'Refresh', refreshing: 'Checking…', synced: (t) => `Synced ${t}`, offline: 'Could not reach the cloud. Showing your last copy.', readOnly: 'Change things on your phone for now.',
+    chat: 'Chat', askPlaceholder: 'Ask Kō…', ask: 'Send', thinking: 'Thinking…', you: 'You',
+    brainErrors: { brain_not_configured: 'My brain isn’t connected yet.', spend_cap: 'I’ve reached this month’s spending limit.', too_many: 'That’s a lot at once. Give me a minute.', offline: 'I can’t reach the cloud right now.', other: 'Something went wrong on my side. Please try again.' },
     signInFailed: 'Sign-in did not finish. Please try again.', notInvited: 'That Google account is not allowed in.', keyring: 'Windows would not save your sign-in. Please try again.',
   },
   pt: {
@@ -21,6 +24,8 @@ const COPY = {
     waiting: 'À tua espera', meeting: 'Reunião', done: 'Feito', skipped: 'Saltado',
     signInTitle: 'Traz o teu dia', signInBody: 'Inicia sessão com a mesma conta Google do telemóvel. O teu dia fica sincronizado.', signIn: 'Continuar com o Google', signingIn: 'À espera do navegador…',
     signOut: 'Terminar sessão', refresh: 'Atualizar', refreshing: 'A verificar…', synced: (t) => `Sincronizado às ${t}`, offline: 'Não foi possível ligar à nuvem. A mostrar a última cópia.', readOnly: 'Por agora, faz as alterações no telemóvel.',
+    chat: 'Conversa', askPlaceholder: 'Pergunta ao Kō…', ask: 'Enviar', thinking: 'A pensar…', you: 'Tu',
+    brainErrors: { brain_not_configured: 'O meu cérebro ainda não está ligado.', spend_cap: 'Cheguei ao limite de gastos deste mês.', too_many: 'É muita coisa de uma vez. Dá-me um minuto.', offline: 'Não consigo ligar à nuvem agora.', other: 'Correu mal do meu lado. Tenta outra vez.' },
     signInFailed: 'O início de sessão não terminou. Tenta outra vez.', notInvited: 'Essa conta Google não tem acesso.', keyring: 'O Windows não guardou a sessão. Tenta outra vez.',
   },
 };
@@ -52,6 +57,13 @@ export function dayView(tables, now) {
     .sort((a, b) => String(b.since).localeCompare(String(a.since)))
     .map((f) => ({ id: f.id, person: f.person, what: f.what, since: f.since, workspace: names[f.workspace_id] || f.workspace_id }));
   return { date, items, current, next, left: open.length, waiting };
+}
+
+/** Today's chat, oldest first, as the screen and the brain need it. */
+export function chatOf(tables, now) {
+  const date = dateKey(now);
+  return rowsOf(tables, 'messages').filter((m) => m.date === date && m.text)
+    .sort((a, b) => (a.created_at || 0) - (b.created_at || 0)).map((m) => ({ id: m.id, who: m.who === 'ko' ? 'ko' : 'user', text: m.text }));
 }
 
 /** What Kō should come and say now, or null. A key names each reminder, so a dismissed one stays dismissed. */

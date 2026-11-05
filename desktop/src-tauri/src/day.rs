@@ -1,5 +1,6 @@
 //! Brings your day down from the cloud (POST /api/sync, the same as the phone) and keeps a copy for when you're offline.
-//! Read-only for now: it pushes nothing, so the desktop can't overwrite what you did on the phone.
+//! Read-only for now: it pushes nothing, so the desktop can't overwrite what you did on the phone. Chat with Kō goes
+//! through his brain on the Worker, which keeps the exchange so the phone sees it too.
 use crate::auth::{self, API_BASE};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -7,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// The tables the Today window uses. The rest of what comes down is not kept here.
-const KEEP: [&str; 5] = ["chunks", "follow_ups", "goals", "settings", "workspaces"];
+const KEEP: [&str; 6] = ["chunks", "follow_ups", "goals", "messages", "settings", "workspaces"];
 const MAX_PAGES: usize = 200;
 
 #[derive(Default, Serialize, Deserialize)]
@@ -101,6 +102,29 @@ pub async fn import_now(http: &reqwest::Client) {
     }
 }
 
+/// Asks Kō's brain. The question is passed through as it is; the Worker checks it. Errors are its short codes.
+pub async fn ask(http: &reqwest::Client, mut question: Value) -> Result<Value, String> {
+    let account = auth::load().ok_or("signed_out")?;
+    question["save"] = json!(true);
+    let reply = http
+        .post(format!("{API_BASE}/api/ko"))
+        .bearer_auth(&account.token)
+        .timeout(std::time::Duration::from_secs(60))
+        .json(&question)
+        .send()
+        .await
+        .map_err(|_| "offline".to_string())?;
+    let status = reply.status();
+    let body: Value = reply.json().await.map_err(|_| "offline".to_string())?;
+    if status.as_u16() == 401 {
+        return Err("signed_out".to_string());
+    }
+    if !status.is_success() {
+        return Err(body.get("error").and_then(Value::as_str).unwrap_or("brain_failed").to_string());
+    }
+    Ok(body)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,12 +133,12 @@ mod tests {
     fn merge_replaces_removes_and_ignores_what_it_does_not_keep() {
         let mut cache = Cache::default();
         let page = |v: Value| v.as_object().unwrap().clone();
-        merge(&mut cache, &page(json!({ "chunks": [{ "id": "a", "title": "one" }, { "id": "b", "title": "two" }], "messages": [{ "id": "m" }] })));
+        merge(&mut cache, &page(json!({ "chunks": [{ "id": "a", "title": "one" }, { "id": "b", "title": "two" }], "alarms": [{ "id": "m" }] })));
         merge(&mut cache, &page(json!({ "chunks": [{ "id": "a", "title": "new" }, { "id": "b", "deleted": 1 }, { "title": "no id" }] })));
         let chunks = &cache.tables["chunks"];
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks["a"]["title"], "new");
-        assert!(!cache.tables.contains_key("messages"));
+        assert!(!cache.tables.contains_key("alarms"));
     }
 
     #[test]

@@ -19,6 +19,7 @@ come from `web/` at build time (`scripts/copy-web.mjs`), so the phone and the de
 - **Coming to you** (`ui/day.js`): 10 minutes before a meeting, and when a chunk starts.
 - **Your day** (`src-tauri/src/day.rs`): pulled through the Worker's `/api/sync`, the same as the phone. Read-only: the
   desktop pushes nothing yet. A copy is kept in the app's data folder for when you're offline.
+- **Chat** (`ui/panel.js`, `src-tauri/src/day.rs`): goes to Kō's brain on the Worker (`api/brain.js`), shared with the phone.
 - **Sign-in** (`src-tauri/src/auth.rs`): Google, in your browser, back to a `127.0.0.1` address with PKCE. The token
   is kept in Windows Credential Manager. Needs the Worker change in `api/index.js` to be deployed.
 

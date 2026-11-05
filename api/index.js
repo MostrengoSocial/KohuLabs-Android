@@ -10,6 +10,7 @@
 //   POST /api/sync                  the app's data ↔ D1 (binding DB; see sync.js)
 //   GET  /api/status                {configured, sync}: whether sign-in and the database are set up
 //   POST /api/refresh               imports Calendar and Gmail now (pull to refresh in the app); at most once a minute
+//   POST /api/ko                    Kō's brain, for the phone and the desktop (brain.js)
 //   (schedule)                      imports everyone's Calendar and Gmail for today (google-import.js); a sync also
 //                                   starts one in the background when the last is over 50 minutes old
 //
@@ -19,10 +20,13 @@
 // Settings (Cloudflare dashboard → the Worker → Settings → Variables and Secrets):
 //   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET   (type: Secret)
 //   FOUNDER_EMAILS   comma-separated Google accounts allowed in, set in wrangler.jsonc
+//   OPENROUTER_API_KEY   Kō's brain (type: Secret). Without it he stays scripted on the phone and says so on the desktop.
+//   KO_MODEL, KO_MONTHLY_CAP_USD   which model, and the most a month may cost, set in wrangler.jsonc
 //   TIMEZONE         the time zone "today" is counted in (default Europe/Lisbon), set in wrangler.jsonc
 import { b64url, cookie, emailList, enc, googleConfig, googleSignIn, json, randomToken, readCookie, redirect, seal, sign, verify } from './google.js';
 import { IMPORT_SCOPES, importAll, importFor, importIfDue } from './google-import.js';
 import { migrate, sync } from './sync.js';
+import { ask } from './brain.js';
 
 const OAUTH_SECONDS = 10 * 60;
 const CODE_SECONDS = 2 * 60;
@@ -110,7 +114,7 @@ async function appUser(request, env) {
   const auth = request.headers.get('Authorization') || '';
   const t = await verify(auth.startsWith('Bearer ') ? auth.slice(7) : null, env.SESSION_SECRET);
   if (!t || t.kind !== 'app') return null;
-  return allowed(t.email, env) ? { email: t.email } : null;     // re-checked every time: removing someone locks them out
+  return allowed(t.email, env) ? { email: t.email, name: t.name } : null;     // re-checked every time: removing someone locks them out
 }
 
 async function syncRoute(request, env, ctx) {
@@ -138,6 +142,16 @@ async function refreshRoute(request, env) {
   return json(await importFor(env, user.email));
 }
 
+async function koRoute(request, env) {
+  const user = await appUser(request, env);
+  if (!user) return json({ error: 'unauthorized' }, 401);
+  if (!env.DB) return json({ error: 'sync_not_configured' }, 503);
+  const { body, tooBig } = await readJson(request, 128 * 1024);
+  if (tooBig) return json({ error: 'too_large' }, 413);
+  const { status, ...out } = await ask(env, user, body);
+  return json(out, status);
+}
+
 // ---- routing -----------------------------------------------------------------------------------------------------
 export default {
   async fetch(request, env, ctx) {
@@ -150,6 +164,7 @@ export default {
       if (route === 'POST /api/token') return await token(request, env);
       if (route === 'POST /api/sync') return await syncRoute(request, env, ctx);
       if (route === 'POST /api/refresh') return await refreshRoute(request, env);
+      if (route === 'POST /api/ko') return await koRoute(request, env);
     } catch (err) {
       return json({ error: 'server_error' }, 500);
     }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attention, dateKey, dayView, langOf } from './day.js';
+import { attention, chatOf, dateKey, dayView, langOf } from './day.js';
 
 const now = new Date(2026, 10, 5, 10, 0);
 const date = dateKey(now);
@@ -53,4 +53,11 @@ test('language comes from the synced setting, and bad data falls back to English
 test('no data yet is an empty day, not an error', () => {
   const v = dayView(null, now);
   assert.deepEqual([v.items, v.waiting, v.current, v.next, v.left], [[], [], null, null, 0]);
+});
+
+test('the chat is today’s, in order, without scripted or deleted lines', () => {
+  const m = (id, who, text, created_at, extra = {}) => ({ id, who, text, created_at, date, ...extra });
+  const messages = { b: m('b', 'ko', 'Hello', 2), a: m('a', 'user', 'Hi', 1), key: m('key', 'ko', null, 3), gone: m('gone', 'user', 'x', 4, { deleted: 1 }), old: m('old', 'user', 'y', 0, { date: '2026-11-04' }) };
+  assert.deepEqual(chatOf({ messages }, now).map((x) => [x.who, x.text]), [['user', 'Hi'], ['ko', 'Hello']]);
+  assert.deepEqual(chatOf(null, now), []);
 });
