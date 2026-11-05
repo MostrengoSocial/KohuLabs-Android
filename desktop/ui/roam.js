@@ -11,10 +11,14 @@ export const BEHAVIOURS = {
   nap: ['sleepy', 'idle', 6, 2],
   ponder: ['neutral', 'thinking', 5, 2],
   hum: ['happy', 'speaking', 3.5, 2],
+  swoop: ['happy', 'idle', 0, 5],    // a long curved flight across the screen; how long depends on how far
+  loop: ['happy', 'speaking', 0, 2], // a wide loop-the-loop
 };
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CALL_SPEED = 420; // px/s when he comes to you
+const SWOOP_SPEED = 380, LOOP_SPIN = 2.1; // px/s, rad/s
+const ease = (t) => t * t * (3 - 2 * t);
 
 export function createRoamer({ width, height, size, x, y, random = Math.random }) {
   let W = width, H = height;
@@ -32,6 +36,18 @@ export function createRoamer({ width, height, size, x, y, random = Math.random }
     if (b === 'nap') k.vx = dir * 20;
     if (b === 'ponder') { k.a = 0; k.cx = k.x - 28; k.cy = k.y; }
     if (b === 'hum') k.baseY = k.y;
+    if (b === 'swoop') {
+      const { minX, maxX, minY, maxY } = bounds(), to = { x: minX + random() * (maxX - minX), y: minY + random() * (maxY - minY) };
+      const dx = to.x - k.x, dy = to.y - k.y, d = Math.hypot(dx, dy) || 1, bend = (random() < 0.5 ? -1 : 1) * d * (0.25 + random() * 0.3);
+      // the curve's control point sits to one side, kept on screen so the whole flight is
+      k.sw = { x0: k.x, y0: k.y, x1: to.x, y1: to.y, cx: clamp((k.x + to.x) / 2 - (dy / d) * bend, minX, maxX), cy: clamp((k.y + to.y) / 2 + (dx / d) * bend, minY, maxY) };
+      k.dur = clamp(d / SWOOP_SPEED, 1.2, 6);
+    }
+    if (b === 'loop') {
+      const { minX, maxX, minY, maxY } = bounds(), R = Math.min(130, (maxX - minX) / 3, (maxY - minY) / 3);
+      k.lr = R; k.cx = clamp(k.x, minX + R, Math.max(minX + R, maxX - R)); k.cy = clamp(k.y - R, minY + R, Math.max(minY + R, maxY - R));
+      k.a = Math.atan2(k.y - k.cy, k.x - k.cx); k.dur = (Math.PI * 2) / LOOP_SPIN;
+    }
   }
 
   function pick() {
@@ -93,6 +109,11 @@ export function createRoamer({ width, height, size, x, y, random = Math.random }
         k.a += dt * 1.3; k.x = k.cx + Math.cos(k.a) * 28; k.y = k.cy + Math.sin(k.a) * 18;
       } else if (b === 'hum') {
         k.baseY = clamp(k.baseY, minY + 14, Math.max(minY + 14, maxY)); k.y = k.baseY - Math.abs(Math.sin(k.t * 5)) * 12;
+      } else if (b === 'swoop') {
+        const t = ease(Math.min(1, k.t / k.dur)), u = 1 - t, q = k.sw;
+        k.x = u * u * q.x0 + 2 * u * t * q.cx + t * t * q.x1; k.y = u * u * q.y0 + 2 * u * t * q.cy + t * t * q.y1;
+      } else if (b === 'loop') {
+        k.a += LOOP_SPIN * dt; k.x = k.cx + Math.cos(k.a) * k.lr; k.y = k.cy + Math.sin(k.a) * k.lr;
       }
       if (b !== 'peek') { // anything else that drifted past the edge eases back (peek ends by returning too)
         if (k.x < minX) k.x += (minX - k.x) * e; else if (k.x > maxX) k.x += (maxX - k.x) * e;

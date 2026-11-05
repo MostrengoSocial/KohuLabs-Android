@@ -12,7 +12,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent};
 
 /// Five minutes without touching anything and Kō has a nap.
 const IDLE_AFTER: u32 = 5 * 60;
@@ -44,6 +44,7 @@ struct Shared {
     http: reqwest::Client,
     syncing: tokio::sync::Mutex<()>,
     signing_in: AtomicBool,
+    wake_area: Mutex<Option<(i32, i32, u32, u32)>>,
 }
 
 fn day_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -75,11 +76,30 @@ fn ko_area(app: AppHandle) -> Result<Area, String> {
         .or_else(|| win.primary_monitor().ok().flatten())
         .ok_or("no display")?;
     let work = monitor.work_area();
-    Ok(Area { x: work.position.x, y: work.position.y, w: work.size.width, h: work.size.height, scale: monitor.scale_factor() })
+    let area = Area { x: work.position.x, y: work.position.y, w: work.size.width, h: work.size.height, scale: monitor.scale_factor() };
+    // The wake's window covers the display Kō is on.
+    let shared = app.state::<Shared>();
+    let mut wake_area = shared.wake_area.lock().unwrap();
+    if *wake_area != Some((area.x, area.y, area.w, area.h)) {
+        if let Some(wake) = app.get_webview_window("wake") {
+            let _ = wake.set_position(PhysicalPosition::new(area.x, area.y));
+            let _ = wake.set_size(PhysicalSize::new(area.w, area.h));
+            *wake_area = Some((area.x, area.y, area.w, area.h));
+        }
+    }
+    Ok(area)
 }
 
+#[derive(Clone, serde::Serialize)]
+struct Moved {
+    x: f64,
+    y: f64,
+}
+
+/// x, y: the window, in physical pixels. lx, ly: the middle of his body on this display, for his wake.
 #[tauri::command]
-fn move_ko(app: AppHandle, x: i32, y: i32) -> Result<(), String> {
+fn move_ko(app: AppHandle, x: i32, y: i32, lx: f64, ly: f64) -> Result<(), String> {
+    let _ = app.emit_to("wake", "ko-moved", Moved { x: lx, y: ly });
     ko(&app).ok_or("no window")?.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())
 }
 
@@ -216,8 +236,12 @@ fn watch(app: AppHandle) {
                 let want = shared.user_visible.load(Ordering::SeqCst) && !platform::should_stay_out_of_the_way();
                 if want != visible {
                     visible = want;
+                    // The wake goes first, so that Kō is drawn on top of it.
+                    if let Some(wake) = app.get_webview_window("wake") {
+                        let _ = if want { wake.show() } else { wake.hide() };
+                    }
                     let _ = if want { win.show() } else { win.hide() };
-                    let _ = app.emit_to("ko", "ko-visible", want);
+                    let _ = app.emit("ko-visible", want);
                 }
             }
         }
@@ -270,6 +294,7 @@ fn main() {
             http: reqwest::Client::builder().timeout(Duration::from_secs(30)).build().expect("HTTP client"),
             syncing: tokio::sync::Mutex::new(()),
             signing_in: AtomicBool::new(false),
+            wake_area: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             ko_area, move_ko, set_hit, set_dragging, open_panel, get_day, sync_day, refresh_day, get_account, sign_in, sign_out
@@ -283,6 +308,9 @@ fn main() {
         })
         .setup(|app| {
             tray(app.handle())?;
+            if let Some(wake) = app.get_webview_window("wake") {
+                wake.set_ignore_cursor_events(true)?; // never in the way of a click
+            }
             watch(app.handle().clone());
             Ok(())
         })

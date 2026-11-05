@@ -16,6 +16,21 @@ test('he stays around the screen for hours, and tries every behaviour', () => {
   assert.deepEqual([...seen].sort(), Object.keys(BEHAVIOURS).sort());
 });
 
+test('swoops and loops stay on the screen and really fly', () => {
+  const r = make(); let fastest = 0, px = r.x, py = r.y, swoops = 0, was = '';
+  for (let i = 0; i < 3600 * 30; i++) {
+    r.step(1 / 30);
+    if (r.behaviour === 'swoop' || r.behaviour === 'loop') {
+      assert.ok(r.x >= -90 && r.x <= 1770 && r.y >= -10 && r.y <= 810, `${r.behaviour} at ${r.x}, ${r.y}`); // he may set off from a peek, half past the edge
+      fastest = Math.max(fastest, Math.hypot(r.x - px, r.y - py) * 30);
+    }
+    if (r.behaviour === 'swoop' && was !== 'swoop') swoops++;
+    was = r.behaviour; px = r.x; py = r.y;
+  }
+  assert.ok(fastest > 300, String(fastest));
+  assert.ok(swoops > 20, String(swoops));
+});
+
 test('he stays on a screen smaller than usual, and after the screen shrinks', () => {
   const r = make({ width: 300, height: 280 });
   for (let i = 0; i < 3000; i++) r.step(1 / 30);

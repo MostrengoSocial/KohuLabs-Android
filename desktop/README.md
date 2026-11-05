@@ -6,6 +6,8 @@ come from `web/` at build time (`scripts/copy-web.mjs`), so the phone and the de
 
 - **Roaming** (`ui/roam.js`): the phone's behaviours. He stops when the pointer is on him, can be dragged anywhere, and
   naps after 5 minutes without input (nothing is drawn while he sleeps).
+- **His wake** (`ui/wake-core.js`, `ui/wake.js`): the ASCII glyphs he leaves behind, as in the homepage intro, drawn in a
+  see-through window over the display. Clicks never land on it, and it stops drawing when no glyph is left.
 - **Clicks** (`src-tauri/src/main.rs`, the watcher): pass through to the windows below everywhere except on Kō.
 - **Out of the way** (`src-tauri/src/platform.rs`): hidden when Windows reports a full-screen app, a presentation or
   "busy". A call in a normal window is not detected; use "Show Kō" in the tray.

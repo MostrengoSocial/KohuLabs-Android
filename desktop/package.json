@@ -4,7 +4,7 @@
   "scripts": {
     "prepare-ui": "node scripts/copy-web.mjs",
     "tauri": "tauri",
-    "test": "node --test ui/roam.test.mjs ui/day.test.mjs"
+    "test": "node --test ui/roam.test.mjs ui/day.test.mjs ui/wake-core.test.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

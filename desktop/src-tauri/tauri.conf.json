@@ -12,6 +12,20 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "wake",
+        "title": "Kō's wake",
+        "url": "wake.html",
+        "width": 800,
+        "height": 600,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "visible": false
+      },
+      {
         "label": "ko",
         "title": "Kō",
         "url": "ko.html",

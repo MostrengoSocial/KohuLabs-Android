@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Kō's own windows may listen to events; everything else goes through the app's commands.",
-  "windows": ["ko", "panel"],
+  "windows": ["wake", "ko", "panel"],
   "permissions": ["core:event:default"]
 }

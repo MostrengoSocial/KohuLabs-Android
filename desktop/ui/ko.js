@@ -50,15 +50,24 @@ function send(force) {
   if (sending || (!force && now - sent < MOVE_MS)) return;
   sent = now; sending = true;
   const x = Math.round(area.x + roamer.x * area.scale), y = Math.round(area.y + roamer.y * area.scale);
-  if (isDemo) { document.body.style.setProperty('--ko-x', x + 'px'); sending = false; return; }
-  invoke('move_ko', { x, y }).catch(() => {}).finally(() => { sending = false; });
+  if (isDemo) { sending = false; return; }
+  invoke('move_ko', { x, y, lx: roamer.x + HIT.cx, ly: roamer.y + HIT.cy }).catch(() => {}).finally(() => { sending = false; });
+}
+// He leans into his flight and stretches a little with speed, as in the homepage intro.
+let tilt = 0, stretch = 0;
+function lean(vx, vy, dt) {
+  tilt += (Math.max(-0.2, Math.min(0.2, vx / 1600)) - tilt) * (1 - Math.exp(-6 * dt));
+  stretch += (Math.min(0.07, Math.hypot(vx, vy) / 6000) - stretch) * (1 - Math.exp(-10 * dt));
+  stage.style.transform = `rotate(${tilt.toFixed(3)}rad) scale(${(1 + stretch).toFixed(3)}, ${(1 - stretch * 0.6).toFixed(3)})`;
 }
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (flags.hidden) return;
+  const px = roamer.x, py = roamer.y;
   roamer.step(dt); look();
+  lean((roamer.x - px) / (dt || 1 / 60), (roamer.y - py) / (dt || 1 / 60), dt);
   if (!flags.drag) send();
 }
 requestAnimationFrame(frame);
